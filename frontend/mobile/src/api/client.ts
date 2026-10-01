@@ -2,10 +2,11 @@ import { Platform } from 'react-native';
 import { ApiResponse, AuthResponse, User } from '../types/auth';
 
 const getBaseUrl = (): string => {
-  if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:5000/api';
+  if (Platform.OS === 'web') {
+    return 'http://localhost:5000/api';
   }
-  return 'http://localhost:5000/api';
+  // Laptop Wi-Fi IP for physical Android/iOS devices on same Wi-Fi network
+  return 'http://10.53.10.252:5000/api';
 };
 
 const BASE_URL = getBaseUrl();
