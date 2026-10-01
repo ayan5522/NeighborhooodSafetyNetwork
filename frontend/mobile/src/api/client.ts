@@ -126,3 +126,58 @@ export const resetPassword = async (
     body: JSON.stringify({ reset_token, new_password, confirm_new_password }),
   });
 };
+
+// Location & Neighborhood APIs
+export const updateCurrentLocation = async (data: {
+  latitude: number;
+  longitude: number;
+  accuracy?: number | null;
+}): Promise<ApiResponse<{ updated: boolean; updated_at: string }>> => {
+  return request<{ updated: boolean; updated_at: string }>('/location/update', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const fetchCurrentLocation = async (): Promise<
+  ApiResponse<{
+    location: {
+      latitude: number;
+      longitude: number;
+      accuracy: number | null;
+      updated_at: string;
+    };
+  }>
+> => {
+  return request('/location/current', {
+    method: 'GET',
+  });
+};
+
+export const fetchNearbyUsers = async (
+  radius: number = 1000
+): Promise<
+  ApiResponse<{
+    nearby_user_count: number;
+    radius_meters: number;
+    nearby_users: Array<{ distance_meters: number }>;
+  }>
+> => {
+  return request(`/location/nearby?radius=${radius}`, {
+    method: 'GET',
+  });
+};
+
+export const fetchNeighborhood = async (): Promise<
+  ApiResponse<{
+    neighborhood: string | null;
+    latitude: number;
+    longitude: number;
+    note?: string;
+  }>
+> => {
+  return request('/location/neighborhood', {
+    method: 'GET',
+  });
+};
+

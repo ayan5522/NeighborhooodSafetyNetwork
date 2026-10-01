@@ -6,12 +6,13 @@ import { LoginScreen } from './src/screens/LoginScreen';
 import { RegisterScreen } from './src/screens/RegisterScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
+import { NeighborhoodMapScreen } from './src/screens/NeighborhoodMapScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
 import { OTPVerificationScreen } from './src/screens/OTPVerificationScreen';
 import { ResetPasswordScreen } from './src/screens/ResetPasswordScreen';
 
 type AuthNavScreen = 'login' | 'register' | 'forgot' | 'otp' | 'reset';
-type MainNavScreen = 'home' | 'profile';
+type MainNavScreen = 'home' | 'profile' | 'map';
 
 const NavigationContainer: React.FC = () => {
   const { authenticated, loading } = useAuth();
@@ -35,7 +36,15 @@ const NavigationContainer: React.FC = () => {
     if (mainScreen === 'profile') {
       return <ProfileScreen onNavigateHome={() => setMainScreen('home')} />;
     }
-    return <HomeScreen onNavigateProfile={() => setMainScreen('profile')} />;
+    if (mainScreen === 'map') {
+      return <NeighborhoodMapScreen onBack={() => setMainScreen('home')} />;
+    }
+    return (
+      <HomeScreen
+        onNavigateProfile={() => setMainScreen('profile')}
+        onNavigateMap={() => setMainScreen('map')}
+      />
+    );
   }
 
   // Unauthenticated Navigation

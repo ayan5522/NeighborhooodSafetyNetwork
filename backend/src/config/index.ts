@@ -38,4 +38,9 @@ export const config = {
   cors: {
     origin: process.env.CORS_ORIGIN || '*',
   },
+  location: {
+    maxAgeMinutes: parseInt(process.env.LOCATION_MAX_AGE_MINUTES || '60', 10),
+    minRadiusMeters: 100,
+    maxRadiusMeters: 10000,
+  },
 };

@@ -4,6 +4,7 @@ import { config } from './config';
 import healthRoutes from './routes/healthRoutes';
 import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
+import locationRoutes from './routes/locationRoutes';
 import { errorHandler } from './middleware/errorHandler';
 import { notFoundHandler } from './middleware/notFoundHandler';
 
@@ -33,6 +34,7 @@ export const createApp = (): Express => {
   app.use('/api', healthRoutes);
   app.use('/api/auth', authRoutes);
   app.use('/api/users', userRoutes);
+  app.use('/api/location', locationRoutes);
 
   // Fallthrough 404 handler
   app.use(notFoundHandler);

@@ -12,9 +12,13 @@ import { Card } from '../components/Card';
 
 interface HomeScreenProps {
   onNavigateProfile: () => void;
+  onNavigateMap: () => void;
 }
 
-export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateProfile }) => {
+export const HomeScreen: React.FC<HomeScreenProps> = ({
+  onNavigateProfile,
+  onNavigateMap,
+}) => {
   const { user, logout } = useAuth();
 
   return (
@@ -66,6 +70,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateProfile }) => 
         </Card>
 
         <View style={styles.actionButtons}>
+          <Button
+            title="🗺️ Open Neighborhood Map"
+            onPress={onNavigateMap}
+            variant="primary"
+          />
           <Button
             title="Edit Profile"
             onPress={onNavigateProfile}
