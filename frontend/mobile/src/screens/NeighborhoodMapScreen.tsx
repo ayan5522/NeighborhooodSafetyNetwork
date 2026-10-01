@@ -155,20 +155,36 @@ export const NeighborhoodMapScreen: React.FC<NeighborhoodMapScreenProps> = ({ on
           </View>
         ) : location ? (
           <View style={styles.mapWrapper}>
-            <WebView
-              ref={webViewRef}
-              originWhitelist={['*']}
-              source={{
-                html: generateMapHtml(
+            {Platform.OS === 'web' ? (
+              <iframe
+                title="Neighborhood Map"
+                srcDoc={generateMapHtml(
                   location.latitude,
                   location.longitude,
                   location.accuracy
-                ),
-              }}
-              style={styles.map}
-              javaScriptEnabled={true}
-              domStorageEnabled={true}
-            />
+                )}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
+                }}
+              />
+            ) : (
+              <WebView
+                ref={webViewRef}
+                originWhitelist={['*']}
+                source={{
+                  html: generateMapHtml(
+                    location.latitude,
+                    location.longitude,
+                    location.accuracy
+                  ),
+                }}
+                style={styles.map}
+                javaScriptEnabled={true}
+                domStorageEnabled={true}
+              />
+            )}
 
             {/* Overlay Info Card */}
             <View style={styles.infoOverlay}>

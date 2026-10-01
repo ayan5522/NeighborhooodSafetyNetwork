@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import * as SecureStore from 'expo-secure-store';
+import { storage } from '../utils/storage';
 import { User } from '../types/auth';
 import {
   setAuthToken,
@@ -39,7 +39,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const restoreSession = async () => {
       try {
-        const storedToken = await SecureStore.getItemAsync(TOKEN_KEY);
+        const storedToken = await storage.getItem(TOKEN_KEY);
         if (storedToken) {
           setAuthToken(storedToken);
           const res = await getCurrentUser();
@@ -48,14 +48,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setToken(storedToken);
           } else {
             // Token expired or invalid
-            await SecureStore.deleteItemAsync(TOKEN_KEY);
+            await storage.deleteItem(TOKEN_KEY);
             setAuthToken(null);
             setUser(null);
             setToken(null);
           }
         }
       } catch (err) {
-        console.warn('Failed to restore session from SecureStore:', err);
+        console.warn('Failed to restore session from storage:', err);
       } finally {
         setLoading(false);
       }
@@ -68,7 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const res = await loginUser({ email, password });
     if (res.success && res.data) {
       const { user: loggedInUser, token: authToken } = res.data;
-      await SecureStore.setItemAsync(TOKEN_KEY, authToken);
+      await storage.setItem(TOKEN_KEY, authToken);
       setAuthToken(authToken);
       setUser(loggedInUser);
       setToken(authToken);
@@ -91,7 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     if (res.success && res.data) {
       const { user: registeredUser, token: authToken } = res.data;
-      await SecureStore.setItemAsync(TOKEN_KEY, authToken);
+      await storage.setItem(TOKEN_KEY, authToken);
       setAuthToken(authToken);
       setUser(registeredUser);
       setToken(authToken);
@@ -106,7 +106,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // Continue cleanup even if server unreachable
     }
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
+    await storage.deleteItem(TOKEN_KEY);
     setAuthToken(null);
     setUser(null);
     setToken(null);
