@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import { ApiResponse, AuthResponse, User } from '../types/auth';
+import { Incident } from '../types/incident';
 
 const getBaseUrl = (): string => {
   if (Platform.OS === 'web') {
@@ -24,9 +25,13 @@ const request = async <T = any>(
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> => {
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
   };
+
+  // Only set Content-Type to JSON if body is NOT FormData
+  if (!(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   if (currentToken) {
     headers['Authorization'] = `Bearer ${currentToken}`;
@@ -179,6 +184,79 @@ export const fetchNeighborhood = async (): Promise<
 > => {
   return request('/location/neighborhood', {
     method: 'GET',
+  });
+};
+
+// Incident Management APIs
+export const getFullImageUrl = (path: string | null | undefined): string | null => {
+  if (!path) return null;
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  const base = BASE_URL.replace('/api', '');
+  return `${base}${path}`;
+};
+
+export const createIncident = async (
+  formData: FormData
+): Promise<ApiResponse<{ incident: Incident }>> => {
+  return request<{ incident: Incident }>('/incidents', {
+    method: 'POST',
+    body: formData,
+  });
+};
+
+export const fetchMyIncidents = async (): Promise<
+  ApiResponse<{ incidents: Incident[] }>
+> => {
+  return request<{ incidents: Incident[] }>('/incidents/my', {
+    method: 'GET',
+  });
+};
+
+export const fetchNearbyIncidents = async (
+  latitude?: number,
+  longitude?: number,
+  radius: number = 5000
+): Promise<ApiResponse<{ incidents: Incident[]; radius_meters: number }>> => {
+  let query = `?radius=${radius}`;
+  if (latitude !== undefined && longitude !== undefined) {
+    query += `&latitude=${latitude}&longitude=${longitude}`;
+  }
+  return request<{ incidents: Incident[]; radius_meters: number }>(
+    `/incidents/nearby${query}`,
+    {
+      method: 'GET',
+    }
+  );
+};
+
+export const fetchIncidentById = async (
+  id: string
+): Promise<ApiResponse<{ incident: Incident }>> => {
+  return request<{ incident: Incident }>(`/incidents/${id}`, {
+    method: 'GET',
+  });
+};
+
+export const updateIncident = async (
+  id: string,
+  data: {
+    title?: string;
+    description?: string;
+    category?: string;
+    severity?: string;
+  }
+): Promise<ApiResponse<{ incident: Incident }>> => {
+  return request<{ incident: Incident }>(`/incidents/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+};
+
+export const cancelIncident = async (
+  id: string
+): Promise<ApiResponse<{ incident: Incident }>> => {
+  return request<{ incident: Incident }>(`/incidents/${id}/cancel`, {
+    method: 'PATCH',
   });
 };
 

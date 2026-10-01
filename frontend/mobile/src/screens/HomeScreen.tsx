@@ -13,11 +13,15 @@ import { Card } from '../components/Card';
 interface HomeScreenProps {
   onNavigateProfile: () => void;
   onNavigateMap: () => void;
+  onNavigateReport: () => void;
+  onNavigateMyReports: () => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   onNavigateProfile,
   onNavigateMap,
+  onNavigateReport,
+  onNavigateMyReports,
 }) => {
   const { user, logout } = useAuth();
 
@@ -60,21 +64,37 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </Card>
 
         <Card>
-          <Text style={styles.cardTitle}>Neighborhood Safety</Text>
+          <Text style={styles.cardTitle}>Neighborhood Safety Actions</Text>
+          <View style={styles.incidentActionGrid}>
+            <Button
+              title="🚨 Report Incident"
+              onPress={onNavigateReport}
+              variant="primary"
+            />
+            <Button
+              title="📋 My Reported Incidents"
+              onPress={onNavigateMyReports}
+              variant="outline"
+            />
+            <Button
+              title="🗺️ Open Neighborhood Map"
+              onPress={onNavigateMap}
+              variant="outline"
+            />
+          </View>
+        </Card>
+
+        <Card>
+          <Text style={styles.cardTitle}>Neighborhood Safety Network</Text>
           <Text style={styles.networkStatus}>
-            🟢 System Foundation & Authentication Operational
+            🟢 Modules 1, 2 & 3 Fully Operational
           </Text>
           <Text style={styles.networkSubtext}>
-            Connected to neighborhood_safety_db with PostGIS spatial indexing.
+            Real-time incident reporting with PostGIS spatial search and photo uploads.
           </Text>
         </Card>
 
         <View style={styles.actionButtons}>
-          <Button
-            title="🗺️ Open Neighborhood Map"
-            onPress={onNavigateMap}
-            variant="primary"
-          />
           <Button
             title="Edit Profile"
             onPress={onNavigateProfile}
@@ -164,6 +184,10 @@ const styles = StyleSheet.create({
   networkSubtext: {
     fontSize: 13,
     color: '#6b7280',
+  },
+  incidentActionGrid: {
+    gap: 10,
+    marginTop: 4,
   },
   actionButtons: {
     marginTop: 10,

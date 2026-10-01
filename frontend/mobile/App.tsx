@@ -10,14 +10,24 @@ import { NeighborhoodMapScreen } from './src/screens/NeighborhoodMapScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
 import { OTPVerificationScreen } from './src/screens/OTPVerificationScreen';
 import { ResetPasswordScreen } from './src/screens/ResetPasswordScreen';
+import { ReportIncidentScreen } from './src/screens/ReportIncidentScreen';
+import { MyReportsScreen } from './src/screens/MyReportsScreen';
+import { IncidentDetailsScreen } from './src/screens/IncidentDetailsScreen';
 
 type AuthNavScreen = 'login' | 'register' | 'forgot' | 'otp' | 'reset';
-type MainNavScreen = 'home' | 'profile' | 'map';
+type MainNavScreen =
+  | 'home'
+  | 'profile'
+  | 'map'
+  | 'report_incident'
+  | 'my_reports'
+  | 'incident_details';
 
 const NavigationContainer: React.FC = () => {
   const { authenticated, loading } = useAuth();
   const [authScreen, setAuthScreen] = useState<AuthNavScreen>('login');
   const [mainScreen, setMainScreen] = useState<MainNavScreen>('home');
+  const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
   const [resetFlowState, setResetFlowState] = useState<{
     email: string;
     devOtp?: string;
@@ -37,12 +47,54 @@ const NavigationContainer: React.FC = () => {
       return <ProfileScreen onNavigateHome={() => setMainScreen('home')} />;
     }
     if (mainScreen === 'map') {
-      return <NeighborhoodMapScreen onBack={() => setMainScreen('home')} />;
+      return (
+        <NeighborhoodMapScreen
+          onBack={() => setMainScreen('home')}
+          onNavigateReport={() => setMainScreen('report_incident')}
+          onSelectIncident={(id) => {
+            setSelectedIncidentId(id);
+            setMainScreen('incident_details');
+          }}
+        />
+      );
+    }
+    if (mainScreen === 'report_incident') {
+      return (
+        <ReportIncidentScreen
+          onBack={() => setMainScreen('home')}
+          onSuccess={(id) => {
+            setSelectedIncidentId(id);
+            setMainScreen('incident_details');
+          }}
+        />
+      );
+    }
+    if (mainScreen === 'my_reports') {
+      return (
+        <MyReportsScreen
+          onBack={() => setMainScreen('home')}
+          onNavigateReport={() => setMainScreen('report_incident')}
+          onSelectIncident={(id) => {
+            setSelectedIncidentId(id);
+            setMainScreen('incident_details');
+          }}
+        />
+      );
+    }
+    if (mainScreen === 'incident_details' && selectedIncidentId) {
+      return (
+        <IncidentDetailsScreen
+          incidentId={selectedIncidentId}
+          onBack={() => setMainScreen('home')}
+        />
+      );
     }
     return (
       <HomeScreen
         onNavigateProfile={() => setMainScreen('profile')}
         onNavigateMap={() => setMainScreen('map')}
+        onNavigateReport={() => setMainScreen('report_incident')}
+        onNavigateMyReports={() => setMainScreen('my_reports')}
       />
     );
   }

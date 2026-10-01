@@ -10,15 +10,22 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useLocation } from '../hooks/useLocation';
-import { fetchNearbyUsers, fetchNeighborhood } from '../api/client';
+import { fetchNearbyUsers, fetchNeighborhood, fetchNearbyIncidents } from '../api/client';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
+import { Incident } from '../types/incident';
 
 interface NeighborhoodMapScreenProps {
   onBack: () => void;
+  onSelectIncident?: (id: string) => void;
+  onNavigateReport?: () => void;
 }
 
-export const NeighborhoodMapScreen: React.FC<NeighborhoodMapScreenProps> = ({ onBack }) => {
+export const NeighborhoodMapScreen: React.FC<NeighborhoodMapScreenProps> = ({
+  onBack,
+  onSelectIncident,
+  onNavigateReport,
+}) => {
   const {
     location,
     permissionStatus,
@@ -30,13 +37,14 @@ export const NeighborhoodMapScreen: React.FC<NeighborhoodMapScreenProps> = ({ on
   const webViewRef = useRef<WebView>(null);
   const [nearbyCount, setNearbyCount] = useState<number | null>(null);
   const [neighborhoodName, setNeighborhoodName] = useState<string | null>(null);
+  const [nearbyIncidents, setNearbyIncidents] = useState<Incident[]>([]);
 
   // Request location on screen mount
   useEffect(() => {
     requestAndSyncLocation();
   }, [requestAndSyncLocation]);
 
-  // When location updates, fetch nearby active count & neighborhood
+  // When location updates, fetch nearby active count, neighborhood & incidents
   useEffect(() => {
     if (location) {
       fetchNearbyUsers(2000).then((res) => {
@@ -50,11 +58,37 @@ export const NeighborhoodMapScreen: React.FC<NeighborhoodMapScreenProps> = ({ on
           setNeighborhoodName(res.data.neighborhood);
         }
       });
+
+      fetchNearbyIncidents(location.latitude, location.longitude, 5000).then((res) => {
+        if (res.success && res.data) {
+          setNearbyIncidents(res.data.incidents);
+        }
+      });
     }
   }, [location]);
 
+  // Web event listener for postMessage from Leaflet popup
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const handleWebMessage = (event: MessageEvent) => {
+        if (event.data && event.data.type === 'SELECT_INCIDENT' && onSelectIncident) {
+          onSelectIncident(event.data.id);
+        }
+      };
+      window.addEventListener('message', handleWebMessage);
+      return () => window.removeEventListener('message', handleWebMessage);
+    }
+  }, [onSelectIncident]);
+
   // Leaflet OpenStreetMap HTML
-  const generateMapHtml = (lat: number, lng: number, acc: number | null) => {
+  const generateMapHtml = (
+    lat: number,
+    lng: number,
+    acc: number | null,
+    incidents: Incident[]
+  ) => {
+    const serializedIncidents = JSON.stringify(incidents);
+
     return `
       <!DOCTYPE html>
       <html>
@@ -78,17 +112,23 @@ export const NeighborhoodMapScreen: React.FC<NeighborhoodMapScreenProps> = ({ on
               height: 18px;
               box-shadow: 0 0 10px rgba(37, 99, 235, 0.7);
             }
+            .incident-pin {
+              border-radius: 50%;
+              border: 2px solid #ffffff;
+              box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+            }
           </style>
         </head>
         <body>
           <div id="map"></div>
           <script>
-            var map = L.map('map', { zoomControl: false }).setView([${lat}, ${lng}], 15);
+            var map = L.map('map', { zoomControl: false }).setView([${lat}, ${lng}], 14);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
               maxZoom: 19,
               attribution: '© OpenStreetMap contributors'
             }).addTo(map);
 
+            // User location marker
             var userIcon = L.divIcon({
               className: 'custom-icon',
               html: '<div class="user-pulse"></div>',
@@ -97,8 +137,7 @@ export const NeighborhoodMapScreen: React.FC<NeighborhoodMapScreenProps> = ({ on
             });
 
             var userMarker = L.marker([${lat}, ${lng}], { icon: userIcon }).addTo(map)
-              .bindPopup('<b>Your Current Location</b><br>Accuracy: ~${acc ? Math.round(acc) + 'm' : 'Standard'}')
-              .openPopup();
+              .bindPopup('<b>Your Current Location</b><br>Accuracy: ~${acc ? Math.round(acc) + 'm' : 'Standard'}');
 
             ${
               acc && acc > 0
@@ -111,6 +150,34 @@ export const NeighborhoodMapScreen: React.FC<NeighborhoodMapScreenProps> = ({ on
                   }).addTo(map);`
                 : ''
             }
+
+            // Render Incident markers
+            var incidents = ${serializedIncidents};
+            incidents.forEach(function(inc) {
+              var color = '#10B981'; // LOW
+              if (inc.severity === 'CRITICAL') color = '#EF4444';
+              else if (inc.severity === 'HIGH') color = '#F97316';
+              else if (inc.severity === 'MEDIUM') color = '#F59E0B';
+
+              var icon = L.divIcon({
+                className: 'custom-incident',
+                html: '<div class="incident-pin" style="background-color:' + color + ';width:16px;height:16px;"></div>',
+                iconSize: [16, 16],
+                iconAnchor: [8, 8]
+              });
+
+              var marker = L.marker([inc.latitude, inc.longitude], { icon: icon }).addTo(map);
+              
+              var popupContent = 
+                '<div style="font-family:system-ui,sans-serif;min-width:140px;">' +
+                '<strong style="font-size:13px;color:#111827;">' + (inc.title || 'Incident') + '</strong><br>' +
+                '<span style="font-size:11px;font-weight:bold;color:' + color + ';">[' + inc.severity + '] ' + inc.category + '</span><br>' +
+                '<span style="font-size:11px;color:#6b7280;">Status: ' + inc.status + '</span><br>' +
+                '<button onclick="window.parent.postMessage({type:\\'SELECT_INCIDENT\\', id:\\'' + inc.id + '\\'}, \\'*\\'); if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({type:\\'SELECT_INCIDENT\\', id:\\'' + inc.id + '\\'}));" style="margin-top:6px;width:100%;padding:4px 8px;background:#2563eb;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:bold;cursor:pointer;">View Details</button>' +
+                '</div>';
+
+              marker.bindPopup(popupContent);
+            });
           </script>
         </body>
       </html>
@@ -129,7 +196,13 @@ export const NeighborhoodMapScreen: React.FC<NeighborhoodMapScreenProps> = ({ on
           <Text style={styles.backButtonText}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Neighborhood Map</Text>
-        <View style={{ width: 60 }} />
+        {onNavigateReport ? (
+          <TouchableOpacity style={styles.reportNavBtn} onPress={onNavigateReport}>
+            <Text style={styles.reportNavBtnText}>+ Report</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 60 }} />
+        )}
       </View>
 
       {/* Main Content */}
@@ -161,7 +234,8 @@ export const NeighborhoodMapScreen: React.FC<NeighborhoodMapScreenProps> = ({ on
                 srcDoc={generateMapHtml(
                   location.latitude,
                   location.longitude,
-                  location.accuracy
+                  location.accuracy,
+                  nearbyIncidents
                 )}
                 style={{
                   width: '100%',
@@ -177,8 +251,17 @@ export const NeighborhoodMapScreen: React.FC<NeighborhoodMapScreenProps> = ({ on
                   html: generateMapHtml(
                     location.latitude,
                     location.longitude,
-                    location.accuracy
+                    location.accuracy,
+                    nearbyIncidents
                   ),
+                }}
+                onMessage={(event) => {
+                  try {
+                    const data = JSON.parse(event.nativeEvent.data);
+                    if (data.type === 'SELECT_INCIDENT' && onSelectIncident) {
+                      onSelectIncident(data.id);
+                    }
+                  } catch {}
                 }}
                 style={styles.map}
                 javaScriptEnabled={true}
@@ -201,15 +284,31 @@ export const NeighborhoodMapScreen: React.FC<NeighborhoodMapScreenProps> = ({ on
                     <Text style={styles.statValue}>{nearbyCount} Resident(s)</Text>
                   </View>
                 )}
+                <View style={styles.statBadge}>
+                  <Text style={styles.statLabel}>Incidents (5km)</Text>
+                  <Text style={[styles.statValue, { color: nearbyIncidents.length > 0 ? '#dc2626' : '#166534' }]}>
+                    {nearbyIncidents.length} Active
+                  </Text>
+                </View>
               </View>
 
-              <Button
-                title={loading ? 'Updating Location...' : '📍 Use My Location'}
-                onPress={handleRecenter}
-                loading={loading}
-                variant="primary"
-                style={styles.recenterButton}
-              />
+              <View style={styles.actionRow}>
+                <Button
+                  title={loading ? 'Updating...' : '📍 Recenter GPS'}
+                  onPress={handleRecenter}
+                  loading={loading}
+                  variant="outline"
+                  style={{ flex: 1 }}
+                />
+                {onNavigateReport && (
+                  <Button
+                    title="⚠️ Report Incident"
+                    onPress={onNavigateReport}
+                    variant="primary"
+                    style={{ flex: 1 }}
+                  />
+                )}
+              </View>
             </View>
           </View>
         ) : null}
@@ -246,6 +345,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#111827',
+  },
+  reportNavBtn: {
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  reportNavBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
   },
   contentContainer: {
     flex: 1,
@@ -306,28 +416,29 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 6,
     elevation: 4,
+    gap: 10,
   },
   statRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
   },
   statBadge: {
     flex: 1,
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#6b7280',
     fontWeight: '500',
   },
   statValue: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#111827',
     fontWeight: '700',
     marginTop: 2,
   },
-  recenterButton: {
-    marginTop: 6,
+  actionRow: {
+    flexDirection: 'row',
+    gap: 8,
   },
 });

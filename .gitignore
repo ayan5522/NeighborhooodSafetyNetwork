@@ -37,3 +37,8 @@ Thumbs.db
 coverage/
 logs/
 *.log
+
+# Uploads
+backend/uploads/*
+!backend/uploads/.gitkeep
+

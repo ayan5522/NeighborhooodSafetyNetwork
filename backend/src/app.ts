@@ -1,3 +1,4 @@
+import path from 'path';
 import express, { Express } from 'express';
 import cors from 'cors';
 import { config } from './config';
@@ -5,6 +6,7 @@ import healthRoutes from './routes/healthRoutes';
 import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
 import locationRoutes from './routes/locationRoutes';
+import incidentRoutes from './routes/incidentRoutes';
 import { errorHandler } from './middleware/errorHandler';
 import { notFoundHandler } from './middleware/notFoundHandler';
 
@@ -21,6 +23,9 @@ export const createApp = (): Express => {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+  // Static files for uploaded incident images
+  app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')));
+
   // Root welcome
   app.get('/', (_req, res) => {
     res.json({
@@ -35,6 +40,7 @@ export const createApp = (): Express => {
   app.use('/api/auth', authRoutes);
   app.use('/api/users', userRoutes);
   app.use('/api/location', locationRoutes);
+  app.use('/api/incidents', incidentRoutes);
 
   // Fallthrough 404 handler
   app.use(notFoundHandler);
