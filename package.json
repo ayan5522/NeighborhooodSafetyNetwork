@@ -1,0 +1,28 @@
+{
+  "name": "neighborhood-safety-network",
+  "version": "1.0.0",
+  "description": "Open Source Neighborhood Safety & Alert Network",
+  "private": true,
+  "scripts": {
+    "backend:dev": "npm run dev --prefix backend",
+    "backend:build": "npm run build --prefix backend",
+    "backend:start": "npm start --prefix backend",
+    "backend:test": "npm test --prefix backend",
+    "backend:migrate": "npm run db:migrate --prefix backend",
+    "mobile:start": "npm start --prefix frontend/mobile",
+    "mobile:tunnel": "npm run start:tunnel --prefix frontend/mobile",
+    "mobile:doctor": "npm run doctor --prefix frontend/mobile",
+    "mobile:check": "npm run check --prefix frontend/mobile",
+    "mobile:typecheck": "npm run typecheck --prefix frontend/mobile"
+  },
+  "keywords": [
+    "neighborhood-safety",
+    "alert-network",
+    "postgis",
+    "react-native",
+    "expo",
+    "authentication"
+  ],
+  "author": "Neighborhood Safety Network Team",
+  "license": "MIT"
+}

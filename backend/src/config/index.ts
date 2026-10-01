@@ -1,0 +1,41 @@
+import dotenv from 'dotenv';
+import path from 'path';
+
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+
+const FORBIDDEN_IDENTITIES = ['rosp_db', 'rosp_user', 'rosp_postgres'];
+
+const dbName = process.env.DB_NAME || 'neighborhood_safety_db';
+const dbUser = process.env.DB_USER || 'nsn_app_user';
+
+// Enforce project identity boundaries: Old ROSP identities are strictly forbidden
+if (
+  FORBIDDEN_IDENTITIES.includes(dbName.toLowerCase()) ||
+  FORBIDDEN_IDENTITIES.includes(dbUser.toLowerCase())
+) {
+  throw new Error(
+    `Security Violation: Connection to deprecated or forbidden database/user '${dbName}/${dbUser}' is rejected. Must use neighborhood_safety_db / nsn_app_user.`
+  );
+}
+
+export const config = {
+  env: process.env.NODE_ENV || 'development',
+  port: parseInt(process.env.PORT || '5000', 10),
+  db: {
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '5432', 10),
+    name: dbName,
+    user: dbUser,
+    password: process.env.DB_PASSWORD || 'nsn_password_2026',
+    max: parseInt(process.env.DB_POOL_MAX || '20', 10),
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
+  },
+  jwt: {
+    secret: process.env.JWT_SECRET || 'nsn_super_secret_jwt_key_2026_change_in_production',
+    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  },
+  cors: {
+    origin: process.env.CORS_ORIGIN || '*',
+  },
+};
