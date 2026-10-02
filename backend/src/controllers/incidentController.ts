@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import fs from 'fs';
 import { IncidentService, IncidentCategory, IncidentSeverity } from '../services/incidentService';
 import { LocationService } from '../services/locationService';
+import { AlertService } from '../services/alertService';
 
 export const createIncident = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
@@ -55,6 +56,14 @@ export const createIncident = async (req: Request, res: Response): Promise<void>
       longitude: lng,
       image_url: imageUrl,
     });
+
+    // Requirement 10 & 48: Generate targeted alerts in post-creation step.
+    // Core incident remains committed even if alert generation encounters a non-fatal issue.
+    try {
+      await AlertService.generateAlertsForIncident(incident);
+    } catch (alertError) {
+      console.error('Non-blocking alert generation warning:', alertError);
+    }
 
     res.status(201).json({
       success: true,
@@ -305,6 +314,13 @@ export const cancelIncident = async (req: Request, res: Response): Promise<void>
         message: 'Incident is already cancelled',
       });
       return;
+    }
+
+    // Resolve associated alerts
+    try {
+      await AlertService.resolveAlertsForIncident(req.params.id);
+    } catch (err) {
+      console.error('Non-blocking alert resolution error:', err);
     }
 
     res.status(200).json({

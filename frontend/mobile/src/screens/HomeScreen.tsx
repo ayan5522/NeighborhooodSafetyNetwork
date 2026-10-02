@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { fetchUnreadAlertCount } from '../api/client';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 
@@ -15,6 +16,8 @@ interface HomeScreenProps {
   onNavigateMap: () => void;
   onNavigateReport: () => void;
   onNavigateMyReports: () => void;
+  onNavigateAlerts: () => void;
+  onNavigateEmergency: () => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -22,8 +25,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onNavigateMap,
   onNavigateReport,
   onNavigateMyReports,
+  onNavigateAlerts,
+  onNavigateEmergency,
 }) => {
   const { user, logout } = useAuth();
+  const [unreadAlertCount, setUnreadAlertCount] = useState<number>(0);
+
+  useEffect(() => {
+    fetchUnreadAlertCount().then((res) => {
+      if (res.success && res.data) {
+        setUnreadAlertCount(res.data.count);
+      }
+    });
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -32,6 +46,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <Text style={styles.welcomeText}>Welcome back,</Text>
           <Text style={styles.userName}>{user?.full_name || 'Resident'}</Text>
         </View>
+
+        {/* Emergency SOS Quick Banner */}
+        <Card>
+          <View style={styles.emergencyCardHeader}>
+            <Text style={styles.emergencyCardTitle}>Personal Safety & SOS</Text>
+            <Text style={styles.emergencyCardBadge}>EMERGENCY</Text>
+          </View>
+          <Text style={styles.emergencyCardDesc}>
+            Need immediate help? Trigger personal emergency SOS or access 112 calling.
+          </Text>
+          <Button
+            title="🚨 Emergency / SOS Assistance"
+            onPress={onNavigateEmergency}
+            variant="danger"
+            style={{ marginTop: 8 }}
+          />
+        </Card>
 
         <Card>
           <Text style={styles.cardTitle}>Account Overview</Text>
@@ -67,9 +98,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <Text style={styles.cardTitle}>Neighborhood Safety Actions</Text>
           <View style={styles.incidentActionGrid}>
             <Button
-              title="🚨 Report Incident"
+              title={
+                unreadAlertCount > 0
+                  ? `🔔 Emergency Alerts (${unreadAlertCount} NEW)`
+                  : '🔔 Emergency Alerts'
+              }
+              onPress={onNavigateAlerts}
+              variant={unreadAlertCount > 0 ? 'primary' : 'outline'}
+            />
+            <Button
+              title="⚠️ Report Safety Incident"
               onPress={onNavigateReport}
-              variant="primary"
+              variant="outline"
             />
             <Button
               title="📋 My Reported Incidents"
@@ -87,10 +127,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <Card>
           <Text style={styles.cardTitle}>Neighborhood Safety Network</Text>
           <Text style={styles.networkStatus}>
-            🟢 Modules 1, 2 & 3 Fully Operational
+            🟢 Modules 1, 2, 3 & 4 Fully Operational
           </Text>
           <Text style={styles.networkSubtext}>
-            Real-time incident reporting with PostGIS spatial search and photo uploads.
+            Auth, PostGIS Location, Incident Reporting, Emergency Alerts & Personal SOS.
           </Text>
         </Card>
 
@@ -184,6 +224,32 @@ const styles = StyleSheet.create({
   networkSubtext: {
     fontSize: 13,
     color: '#6b7280',
+  },
+  emergencyCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  emergencyCardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#991b1b',
+  },
+  emergencyCardBadge: {
+    backgroundColor: '#fee2e2',
+    color: '#dc2626',
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  emergencyCardDesc: {
+    fontSize: 13,
+    color: '#6b7280',
+    lineHeight: 18,
+    marginBottom: 4,
   },
   incidentActionGrid: {
     gap: 10,

@@ -13,6 +13,10 @@ import { ResetPasswordScreen } from './src/screens/ResetPasswordScreen';
 import { ReportIncidentScreen } from './src/screens/ReportIncidentScreen';
 import { MyReportsScreen } from './src/screens/MyReportsScreen';
 import { IncidentDetailsScreen } from './src/screens/IncidentDetailsScreen';
+import { AlertsScreen } from './src/screens/AlertsScreen';
+import { AlertDetailsScreen } from './src/screens/AlertDetailsScreen';
+import { EmergencyScreen } from './src/screens/EmergencyScreen';
+import { EmergencyContactsScreen } from './src/screens/EmergencyContactsScreen';
 
 type AuthNavScreen = 'login' | 'register' | 'forgot' | 'otp' | 'reset';
 type MainNavScreen =
@@ -21,13 +25,18 @@ type MainNavScreen =
   | 'map'
   | 'report_incident'
   | 'my_reports'
-  | 'incident_details';
+  | 'incident_details'
+  | 'alerts'
+  | 'alert_details'
+  | 'emergency'
+  | 'emergency_contacts';
 
 const NavigationContainer: React.FC = () => {
   const { authenticated, loading } = useAuth();
   const [authScreen, setAuthScreen] = useState<AuthNavScreen>('login');
   const [mainScreen, setMainScreen] = useState<MainNavScreen>('home');
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
+  const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
   const [resetFlowState, setResetFlowState] = useState<{
     email: string;
     devOtp?: string;
@@ -89,12 +98,49 @@ const NavigationContainer: React.FC = () => {
         />
       );
     }
+    if (mainScreen === 'alerts') {
+      return (
+        <AlertsScreen
+          onBack={() => setMainScreen('home')}
+          onSelectAlert={(id) => {
+            setSelectedAlertId(id);
+            setMainScreen('alert_details');
+          }}
+        />
+      );
+    }
+    if (mainScreen === 'alert_details' && selectedAlertId) {
+      return (
+        <AlertDetailsScreen
+          alertId={selectedAlertId}
+          onBack={() => setMainScreen('alerts')}
+          onNavigateMap={() => setMainScreen('map')}
+        />
+      );
+    }
+    if (mainScreen === 'emergency') {
+      return (
+        <EmergencyScreen
+          onBack={() => setMainScreen('home')}
+          onManageContacts={() => setMainScreen('emergency_contacts')}
+        />
+      );
+    }
+    if (mainScreen === 'emergency_contacts') {
+      return (
+        <EmergencyContactsScreen
+          onBack={() => setMainScreen('emergency')}
+        />
+      );
+    }
     return (
       <HomeScreen
         onNavigateProfile={() => setMainScreen('profile')}
         onNavigateMap={() => setMainScreen('map')}
         onNavigateReport={() => setMainScreen('report_incident')}
         onNavigateMyReports={() => setMainScreen('my_reports')}
+        onNavigateAlerts={() => setMainScreen('alerts')}
+        onNavigateEmergency={() => setMainScreen('emergency')}
       />
     );
   }

@@ -7,6 +7,9 @@ import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
 import locationRoutes from './routes/locationRoutes';
 import incidentRoutes from './routes/incidentRoutes';
+import alertRoutes from './routes/alertRoutes';
+import emergencyContactRoutes from './routes/emergencyContactRoutes';
+import sosRoutes from './routes/sosRoutes';
 import { errorHandler } from './middleware/errorHandler';
 import { notFoundHandler } from './middleware/notFoundHandler';
 
@@ -41,6 +44,9 @@ export const createApp = (): Express => {
   app.use('/api/users', userRoutes);
   app.use('/api/location', locationRoutes);
   app.use('/api/incidents', incidentRoutes);
+  app.use('/api/alerts', alertRoutes);
+  app.use('/api/emergency-contacts', emergencyContactRoutes);
+  app.use('/api/sos', sosRoutes);
 
   // Fallthrough 404 handler
   app.use(notFoundHandler);

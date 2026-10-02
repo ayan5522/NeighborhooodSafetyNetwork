@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import { ApiResponse, AuthResponse, User } from '../types/auth';
 import { Incident } from '../types/incident';
+import { Alert, EmergencyContact, SOSEvent } from '../types/alert';
 
 const getBaseUrl = (): string => {
   if (Platform.OS === 'web') {
@@ -256,6 +257,94 @@ export const cancelIncident = async (
   id: string
 ): Promise<ApiResponse<{ incident: Incident }>> => {
   return request<{ incident: Incident }>(`/incidents/${id}/cancel`, {
+    method: 'PATCH',
+  });
+};
+
+// Module 04: Emergency Alerts APIs
+export const fetchUserAlerts = async (): Promise<
+  ApiResponse<{ alerts: Alert[] }>
+> => {
+  return request<{ alerts: Alert[] }>('/alerts', {
+    method: 'GET',
+  });
+};
+
+export const fetchUnreadAlertCount = async (): Promise<
+  ApiResponse<{ count: number }>
+> => {
+  return request<{ count: number }>('/alerts/unread-count', {
+    method: 'GET',
+  });
+};
+
+export const fetchAlertById = async (
+  id: string
+): Promise<ApiResponse<{ alert: Alert }>> => {
+  return request<{ alert: Alert }>(`/alerts/${id}`, {
+    method: 'GET',
+  });
+};
+
+export const markAlertAsRead = async (
+  id: string
+): Promise<ApiResponse<{ alert: Alert }>> => {
+  return request<{ alert: Alert }>(`/alerts/${id}/read`, {
+    method: 'PATCH',
+  });
+};
+
+// Module 04: Emergency Contacts APIs
+export const fetchEmergencyContacts = async (): Promise<
+  ApiResponse<{ contacts: EmergencyContact[] }>
+> => {
+  return request<{ contacts: EmergencyContact[] }>('/emergency-contacts', {
+    method: 'GET',
+  });
+};
+
+export const createEmergencyContact = async (data: {
+  contact_name: string;
+  phone_number: string;
+  is_primary?: boolean;
+}): Promise<ApiResponse<{ contact: EmergencyContact }>> => {
+  return request<{ contact: EmergencyContact }>('/emergency-contacts', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const deleteEmergencyContact = async (
+  id: string
+): Promise<ApiResponse<{ message: string }>> => {
+  return request<{ message: string }>(`/emergency-contacts/${id}`, {
+    method: 'DELETE',
+  });
+};
+
+// Module 04: Personal SOS APIs
+export const createSOS = async (
+  latitude: number,
+  longitude: number
+): Promise<ApiResponse<{ sos: SOSEvent; is_existing: boolean }>> => {
+  return request<{ sos: SOSEvent; is_existing: boolean }>('/sos', {
+    method: 'POST',
+    body: JSON.stringify({ latitude, longitude }),
+  });
+};
+
+export const fetchMySOS = async (): Promise<
+  ApiResponse<{ sos_events: SOSEvent[] }>
+> => {
+  return request<{ sos_events: SOSEvent[] }>('/sos/my', {
+    method: 'GET',
+  });
+};
+
+export const resolveSOS = async (
+  id: string
+): Promise<ApiResponse<{ sos: SOSEvent }>> => {
+  return request<{ sos: SOSEvent }>(`/sos/${id}/resolve`, {
     method: 'PATCH',
   });
 };
