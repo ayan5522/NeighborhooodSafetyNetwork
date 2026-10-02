@@ -3,6 +3,7 @@ import { ApiResponse, AuthResponse, User } from '../types/auth';
 import { Incident } from '../types/incident';
 import { Alert, EmergencyContact, SOSEvent } from '../types/alert';
 import { VerificationSummary, VerificationType } from '../types/verification';
+import { NotificationRecord, NotificationsResponse } from '../types/notification';
 
 const getBaseUrl = (): string => {
   if (Platform.OS === 'web') {
@@ -366,6 +367,40 @@ export const fetchIncidentVerifications = async (
 ): Promise<ApiResponse<VerificationSummary>> => {
   return request<VerificationSummary>(`/incidents/${incidentId}/verifications`, {
     method: 'GET',
+  });
+};
+
+// Module 06: Real-Time Communication & Notifications APIs
+export const fetchNotifications = async (
+  page: number = 1,
+  limit: number = 20
+): Promise<ApiResponse<NotificationsResponse>> => {
+  return request<NotificationsResponse>(`/notifications?page=${page}&limit=${limit}`, {
+    method: 'GET',
+  });
+};
+
+export const fetchUnreadNotificationCount = async (): Promise<
+  ApiResponse<{ unread_count: number }>
+> => {
+  return request<{ unread_count: number }>('/notifications/unread-count', {
+    method: 'GET',
+  });
+};
+
+export const markNotificationAsRead = async (
+  id: string
+): Promise<ApiResponse<{ notification: NotificationRecord }>> => {
+  return request<{ notification: NotificationRecord }>(`/notifications/${id}/read`, {
+    method: 'PATCH',
+  });
+};
+
+export const markAllNotificationsAsRead = async (): Promise<
+  ApiResponse<{ marked_count: number }>
+> => {
+  return request<{ marked_count: number }>('/notifications/read-all', {
+    method: 'PATCH',
   });
 };
 

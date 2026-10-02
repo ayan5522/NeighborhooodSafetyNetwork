@@ -6,6 +6,7 @@ import {
   AlertPriority,
   AlertStatus,
 } from '../config/alertConfig';
+import { NotificationService } from './notificationService';
 
 export interface AlertIncidentSummary {
   id: string;
@@ -80,7 +81,7 @@ export class AlertService {
           $8
         )
       ON CONFLICT (incident_id, recipient_user_id) DO NOTHING
-      RETURNING id;
+      RETURNING id, recipient_user_id;
     `;
 
     const res = await query(sql, [
@@ -93,6 +94,22 @@ export class AlertService {
       incident.latitude,
       rule.radiusMeters,
     ]);
+
+    // Module 06: Generate persistent notification and emit real-time event for each recipient
+    for (const alert of res.rows) {
+      try {
+        await NotificationService.createNotification({
+          user_id: alert.recipient_user_id,
+          type: 'ALERT_CREATED',
+          title: 'Safety alert nearby',
+          message: `A ${incident.severity} severity ${incident.category.toLowerCase().replace(/_/g, ' ')} was reported near you.`,
+          incident_id: incident.id,
+          alert_id: alert.id,
+        });
+      } catch (notifErr) {
+        console.warn('Non-blocking notification generation warning:', notifErr);
+      }
+    }
 
     return res.rows.length;
   }
@@ -272,9 +289,26 @@ export class AlertService {
       UPDATE alerts
       SET status = 'RESOLVED'
       WHERE incident_id = $1
-        AND status = 'ACTIVE';
+        AND status = 'ACTIVE'
+      RETURNING id, recipient_user_id;
     `;
     const res = await query(sql, [incidentId]);
+
+    for (const alert of res.rows) {
+      try {
+        await NotificationService.createNotification({
+          user_id: alert.recipient_user_id,
+          type: 'ALERT_RESOLVED',
+          title: 'Alert Resolved',
+          message: 'An earlier safety alert in your neighborhood has been resolved.',
+          incident_id: incidentId,
+          alert_id: alert.id,
+        });
+      } catch (err) {
+        console.warn('Non-blocking alert resolution notification warning:', err);
+      }
+    }
+
     return res.rowCount || 0;
   }
 }

@@ -7,6 +7,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import { fetchUnreadAlertCount } from '../api/client';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
@@ -18,6 +19,7 @@ interface HomeScreenProps {
   onNavigateMyReports: () => void;
   onNavigateAlerts: () => void;
   onNavigateEmergency: () => void;
+  onNavigateNotifications: () => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -27,8 +29,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onNavigateMyReports,
   onNavigateAlerts,
   onNavigateEmergency,
+  onNavigateNotifications,
 }) => {
   const { user, logout } = useAuth();
+  const { unreadCount: unreadNotifCount, isSocketConnected } = useNotifications();
   const [unreadAlertCount, setUnreadAlertCount] = useState<number>(0);
 
   useEffect(() => {
@@ -43,8 +47,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.header}>
-          <Text style={styles.welcomeText}>Welcome back,</Text>
-          <Text style={styles.userName}>{user?.full_name || 'Resident'}</Text>
+          <View>
+            <Text style={styles.welcomeText}>Welcome back,</Text>
+            <Text style={styles.userName}>{user?.full_name || 'Resident'}</Text>
+          </View>
+          <View style={styles.liveBadge}>
+            <View
+              style={[
+                styles.liveDot,
+                { backgroundColor: isSocketConnected ? '#22c55e' : '#9ca3af' },
+              ]}
+            />
+            <Text style={styles.liveText}>
+              {isSocketConnected ? 'Real-Time Connected' : 'Offline Mode'}
+            </Text>
+          </View>
         </View>
 
         {/* Emergency SOS Quick Banner */}
@@ -99,12 +116,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <View style={styles.incidentActionGrid}>
             <Button
               title={
+                unreadNotifCount > 0
+                  ? `📨 Notifications (${unreadNotifCount} NEW)`
+                  : '📨 Notifications'
+              }
+              onPress={onNavigateNotifications}
+              variant={unreadNotifCount > 0 ? 'primary' : 'outline'}
+            />
+            <Button
+              title={
                 unreadAlertCount > 0
                   ? `🔔 Emergency Alerts (${unreadAlertCount} NEW)`
                   : '🔔 Emergency Alerts'
               }
               onPress={onNavigateAlerts}
-              variant={unreadAlertCount > 0 ? 'primary' : 'outline'}
+              variant="outline"
             />
             <Button
               title="⚠️ Report Safety Incident"
@@ -127,10 +153,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <Card>
           <Text style={styles.cardTitle}>Neighborhood Safety Network</Text>
           <Text style={styles.networkStatus}>
-            🟢 Modules 1, 2, 3 & 4 Fully Operational
+            🟢 Modules 1 to 6 Fully Operational
           </Text>
           <Text style={styles.networkSubtext}>
-            Auth, PostGIS Location, Incident Reporting, Emergency Alerts & Personal SOS.
+            Auth, PostGIS Location, Incident Reporting, Alerts, Community Verification & Real-Time Notifications.
           </Text>
         </Card>
 
@@ -161,6 +187,9 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   welcomeText: {
     fontSize: 16,
@@ -171,6 +200,27 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#111827',
     marginTop: 2,
+  },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  liveText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#4b5563',
   },
   cardTitle: {
     fontSize: 18,

@@ -1,6 +1,6 @@
 import http from 'http';
-import { Server as SocketIOServer } from 'socket.io';
 import { createApp } from './app';
+import { initSocketServer } from './socket';
 import { config } from './config';
 import { checkDatabaseHealth, closePool } from './db';
 import { runMigrations } from './db/migrate';
@@ -24,21 +24,8 @@ const startServer = async () => {
     const app = createApp();
     const server = http.createServer(app);
 
-    // Initialize Socket.IO
-    const io = new SocketIOServer(server, {
-      cors: {
-        origin: config.cors.origin,
-        methods: ['GET', 'POST', 'PATCH', 'DELETE'],
-        credentials: true,
-      },
-    });
-
-    io.on('connection', (socket) => {
-      console.log(`Socket client connected: ${socket.id}`);
-      socket.on('disconnect', () => {
-        console.log(`Socket client disconnected: ${socket.id}`);
-      });
-    });
+    // Initialize Socket.IO with JWT auth & room management (Module 06)
+    const io = initSocketServer(server);
 
     server.listen(config.port, () => {
       console.log(`====================================================`);

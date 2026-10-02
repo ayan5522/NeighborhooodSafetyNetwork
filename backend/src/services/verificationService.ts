@@ -1,5 +1,6 @@
 import { query } from '../db';
 import { IncidentService } from './incidentService';
+import { NotificationService } from './notificationService';
 
 export const VALID_VERIFICATION_TYPES = ['CONFIRM', 'DISPUTE'] as const;
 export type VerificationType = typeof VALID_VERIFICATION_TYPES[number];
@@ -147,6 +148,20 @@ export class VerificationService {
     `;
 
     await query(upsertSql, [incidentId, userId, verificationType]);
+
+    // Module 06: Generate COMMUNITY_VERIFICATION notification for incident reporter (shielding verifier identity)
+    try {
+      const typeLabel = verificationType === 'CONFIRM' ? 'confirmation' : 'dispute';
+      await NotificationService.createNotification({
+        user_id: incident.reporter_id,
+        type: 'COMMUNITY_VERIFICATION',
+        title: 'Community Response',
+        message: `Your incident report received a new community ${typeLabel}.`,
+        incident_id: incidentId,
+      });
+    } catch (notifErr) {
+      console.warn('Non-blocking verification notification warning:', notifErr);
+    }
 
     const summary = await this.getVerificationSummary(incidentId, userId);
     return {
