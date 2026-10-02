@@ -17,6 +17,8 @@ import {
   updateIncident,
   cancelIncident,
   getFullImageUrl,
+  verifyIncident,
+  fetchIncidentVerifications,
 } from '../api/client';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
@@ -28,6 +30,11 @@ import {
   SEVERITY_COLORS,
   STATUS_COLORS,
 } from '../types/incident';
+import {
+  VerificationSummary,
+  VerificationType,
+  VERIFICATION_STATUS_META,
+} from '../types/verification';
 
 interface IncidentDetailsScreenProps {
   incidentId: string;
@@ -57,7 +64,11 @@ export const IncidentDetailsScreen: React.FC<IncidentDetailsScreenProps> = ({
   const [incident, setIncident] = useState<Incident | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [verifyingLoading, setVerifyingLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Verification state (Module 05)
+  const [verification, setVerification] = useState<VerificationSummary | null>(null);
 
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false);
@@ -77,6 +88,15 @@ export const IncidentDetailsScreen: React.FC<IncidentDetailsScreenProps> = ({
         setEditDescription(inc.description);
         setEditCategory(inc.category);
         setEditSeverity(inc.severity);
+
+        if (inc.verification) {
+          setVerification(inc.verification);
+        } else {
+          const vRes = await fetchIncidentVerifications(incidentId);
+          if (vRes.success && vRes.data) {
+            setVerification(vRes.data);
+          }
+        }
       } else {
         setError(res.message || 'Incident not found');
       }
@@ -158,6 +178,31 @@ export const IncidentDetailsScreen: React.FC<IncidentDetailsScreenProps> = ({
     );
   };
 
+  const handleVerify = async (type: VerificationType) => {
+    if (isOwner) {
+      Alert.alert('Not Permitted', 'You cannot verify your own report.');
+      return;
+    }
+    if (isCancelled || incident?.status === 'RESOLVED') {
+      Alert.alert('Notice', 'Verification is closed for this incident.');
+      return;
+    }
+
+    setVerifyingLoading(true);
+    try {
+      const res = await verifyIncident(incidentId, type);
+      if (res.success && res.data) {
+        setVerification(res.data);
+      } else {
+        Alert.alert('Verification Failed', res.message || 'Could not submit verification.');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'An unexpected error occurred.');
+    } finally {
+      setVerifyingLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -190,6 +235,7 @@ export const IncidentDetailsScreen: React.FC<IncidentDetailsScreenProps> = ({
   const sevColor = SEVERITY_COLORS[incident.severity] || '#6b7280';
   const statusColor = STATUS_COLORS[incident.status] || '#6b7280';
   const fullImg = getFullImageUrl(incident.image_url);
+  const verificationMeta = VERIFICATION_STATUS_META[verification?.status || 'UNVERIFIED'];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -348,9 +394,115 @@ export const IncidentDetailsScreen: React.FC<IncidentDetailsScreenProps> = ({
           </Card>
         )}
 
-        {/* Geotag & Reporter Info */}
+        {/* Module 05: Community Verification Section */}
         <Card>
-          <Text style={styles.sectionTitle}>Location & Verification Info</Text>
+          <View style={styles.verificationHeaderRow}>
+            <Text style={styles.sectionTitle}>Community Verification</Text>
+            <View
+              style={[
+                styles.verificationBadge,
+                { backgroundColor: verificationMeta.bgColor },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.verificationBadgeText,
+                  { color: verificationMeta.color },
+                ]}
+              >
+                {verificationMeta.label}
+              </Text>
+            </View>
+          </View>
+
+          {/* Aggregate Counts */}
+          <View style={styles.verificationCountsRow}>
+            <View style={styles.countCard}>
+              <Text style={styles.countNumber}>
+                {verification?.confirm_count ?? 0}
+              </Text>
+              <Text style={styles.countLabel}>Confirmed</Text>
+            </View>
+            <View style={styles.countDivider} />
+            <View style={styles.countCard}>
+              <Text style={styles.countNumber}>
+                {verification?.dispute_count ?? 0}
+              </Text>
+              <Text style={styles.countLabel}>Disputed</Text>
+            </View>
+          </View>
+
+          {/* Verification Actions or Reporter / Closed Notices */}
+          {isOwner ? (
+            <View style={styles.reporterNoticeBox}>
+              <Text style={styles.reporterNoticeText}>
+                You reported this incident. You cannot verify your own report.
+              </Text>
+            </View>
+          ) : isCancelled || incident.status === 'RESOLVED' ? (
+            <View style={styles.closedNoticeBox}>
+              <Text style={styles.closedNoticeText}>
+                Verification is closed because this incident is {incident.status.toLowerCase()}.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.verificationBtnGroup}>
+              <TouchableOpacity
+                style={[
+                  styles.verifyBtn,
+                  styles.confirmBtn,
+                  verification?.my_verification === 'CONFIRM' && styles.verifyBtnActiveConfirm,
+                ]}
+                onPress={() => handleVerify('CONFIRM')}
+                disabled={verifyingLoading}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.verifyBtnText,
+                    styles.confirmBtnText,
+                    verification?.my_verification === 'CONFIRM' && styles.verifyBtnActiveText,
+                  ]}
+                >
+                  {verification?.my_verification === 'CONFIRM' ? '✓ You Confirmed' : '👍 Confirm'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.verifyBtn,
+                  styles.disputeBtn,
+                  verification?.my_verification === 'DISPUTE' && styles.verifyBtnActiveDispute,
+                ]}
+                onPress={() => handleVerify('DISPUTE')}
+                disabled={verifyingLoading}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.verifyBtnText,
+                    styles.disputeBtnText,
+                    verification?.my_verification === 'DISPUTE' && styles.verifyBtnActiveText,
+                  ]}
+                >
+                  {verification?.my_verification === 'DISPUTE' ? '✗ You Disputed' : '👎 Dispute'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {verifyingLoading && (
+            <ActivityIndicator size="small" color="#2563eb" style={{ marginTop: 8 }} />
+          )}
+
+          <Text style={styles.verificationDisclaimer}>
+            Community verification reflects responses from local residents. It does not independently establish factual truth.
+          </Text>
+        </Card>
+
+        {/* Location & Reporter Info */}
+        <Card>
+          <Text style={styles.sectionTitle}>Location & Reporter Details</Text>
 
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Coordinates:</Text>
@@ -603,5 +755,129 @@ const styles = StyleSheet.create({
     color: '#dc2626',
     fontSize: 14,
     textAlign: 'center',
+  },
+  // Module 05: Community Verification Styles
+  verificationHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  verificationBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  verificationBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  verificationCountsRow: {
+    flexDirection: 'row',
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    marginBottom: 14,
+  },
+  countCard: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  countNumber: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  countLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  countDivider: {
+    width: 1,
+    height: 36,
+    backgroundColor: '#e5e7eb',
+  },
+  reporterNoticeBox: {
+    backgroundColor: '#eff6ff',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  reporterNoticeText: {
+    fontSize: 13,
+    color: '#1e40af',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  closedNoticeBox: {
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  closedNoticeText: {
+    fontSize: 13,
+    color: '#6b7280',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  verificationBtnGroup: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 10,
+  },
+  verifyBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+  },
+  verifyBtnText: {
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  confirmBtn: {
+    borderColor: '#10b981',
+    backgroundColor: '#ffffff',
+  },
+  confirmBtnText: {
+    color: '#059669',
+  },
+  disputeBtn: {
+    borderColor: '#ef4444',
+    backgroundColor: '#ffffff',
+  },
+  disputeBtnText: {
+    color: '#dc2626',
+  },
+  verifyBtnActiveConfirm: {
+    backgroundColor: '#10b981',
+    borderColor: '#059669',
+  },
+  verifyBtnActiveDispute: {
+    backgroundColor: '#ef4444',
+    borderColor: '#dc2626',
+  },
+  verifyBtnActiveText: {
+    color: '#ffffff',
+  },
+  verificationDisclaimer: {
+    fontSize: 11,
+    color: '#9ca3af',
+    lineHeight: 16,
+    textAlign: 'center',
+    marginTop: 8,
+    fontStyle: 'italic',
   },
 });

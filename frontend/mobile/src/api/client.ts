@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import { ApiResponse, AuthResponse, User } from '../types/auth';
 import { Incident } from '../types/incident';
 import { Alert, EmergencyContact, SOSEvent } from '../types/alert';
+import { VerificationSummary, VerificationType } from '../types/verification';
 
 const getBaseUrl = (): string => {
   if (Platform.OS === 'web') {
@@ -348,4 +349,24 @@ export const resolveSOS = async (
     method: 'PATCH',
   });
 };
+
+// Module 05: Community Verification APIs
+export const verifyIncident = async (
+  incidentId: string,
+  verificationType: VerificationType
+): Promise<ApiResponse<VerificationSummary>> => {
+  return request<VerificationSummary>(`/incidents/${incidentId}/verify`, {
+    method: 'POST',
+    body: JSON.stringify({ verification_type: verificationType }),
+  });
+};
+
+export const fetchIncidentVerifications = async (
+  incidentId: string
+): Promise<ApiResponse<VerificationSummary>> => {
+  return request<VerificationSummary>(`/incidents/${incidentId}/verifications`, {
+    method: 'GET',
+  });
+};
+
 

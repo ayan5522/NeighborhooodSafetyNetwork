@@ -3,6 +3,7 @@ import fs from 'fs';
 import { IncidentService, IncidentCategory, IncidentSeverity } from '../services/incidentService';
 import { LocationService } from '../services/locationService';
 import { AlertService } from '../services/alertService';
+import { VerificationService } from '../services/verificationService';
 
 export const createIncident = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
@@ -196,10 +197,15 @@ export const getIncidentById = async (req: Request, res: Response): Promise<void
       return;
     }
 
+    const verification = await VerificationService.getVerificationSummary(req.params.id, req.user.id);
+
     res.status(200).json({
       success: true,
       data: {
-        incident,
+        incident: {
+          ...incident,
+          verification,
+        },
       },
     });
   } catch (error: any) {

@@ -1,3 +1,5 @@
+import { VerificationSummary } from './verification';
+
 export type IncidentCategory =
   | 'ACCIDENT'
   | 'FIRE'
@@ -27,6 +29,7 @@ export interface Incident {
   created_at: string;
   updated_at: string;
   distance_meters?: number;
+  verification?: VerificationSummary;
 }
 
 export const CATEGORY_LABELS: Record<IncidentCategory, string> = {
