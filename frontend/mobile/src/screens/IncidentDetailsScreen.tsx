@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
   TextInput,
+  Modal,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -19,7 +20,9 @@ import {
   getFullImageUrl,
   verifyIncident,
   fetchIncidentVerifications,
+  reportIncident,
 } from '../api/client';
+import { ReportReason } from '../types/admin';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import {
@@ -69,6 +72,12 @@ export const IncidentDetailsScreen: React.FC<IncidentDetailsScreenProps> = ({
 
   // Verification state (Module 05)
   const [verification, setVerification] = useState<VerificationSummary | null>(null);
+
+  // Incident Flagging state (Module 07)
+  const [flagModalVisible, setFlagModalVisible] = useState(false);
+  const [flagReason, setFlagReason] = useState<ReportReason>('MISLEADING');
+  const [flagDescription, setFlagDescription] = useState('');
+  const [flagSubmitting, setFlagSubmitting] = useState(false);
 
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false);
@@ -200,6 +209,32 @@ export const IncidentDetailsScreen: React.FC<IncidentDetailsScreenProps> = ({
       Alert.alert('Error', err.message || 'An unexpected error occurred.');
     } finally {
       setVerifyingLoading(false);
+    }
+  };
+
+  const handleSubmitFlag = async () => {
+    if (!incident) return;
+    setFlagSubmitting(true);
+    try {
+      const res = await reportIncident(
+        incident.id,
+        flagReason,
+        flagDescription.trim() || undefined
+      );
+      if (res.success) {
+        Alert.alert(
+          'Flag Submitted',
+          'Thank you. Your report has been submitted to the community moderation queue for review.'
+        );
+        setFlagModalVisible(false);
+        setFlagDescription('');
+      } else {
+        Alert.alert('Report Error', res.message || 'Could not submit flag');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Submission failed');
+    } finally {
+      setFlagSubmitting(false);
     }
   };
 
@@ -535,6 +570,17 @@ export const IncidentDetailsScreen: React.FC<IncidentDetailsScreenProps> = ({
           )}
         </Card>
 
+        {/* Module 07: Community Moderation Flag (for non-owners) */}
+        {!isOwner && !isCancelled && incident.status !== 'RESOLVED' && (
+          <View style={styles.actionContainer}>
+            <Button
+              title="🚩 Flag / Report Incident"
+              onPress={() => setFlagModalVisible(true)}
+              variant="outline"
+            />
+          </View>
+        )}
+
         {/* Reporter Actions */}
         {isOwner && !isCancelled && !isEditing && (
           <View style={styles.actionContainer}>
@@ -547,6 +593,83 @@ export const IncidentDetailsScreen: React.FC<IncidentDetailsScreenProps> = ({
           </View>
         )}
       </ScrollView>
+
+      {/* Flag Incident Modal */}
+      <Modal visible={flagModalVisible} transparent animationType="fade">
+        <View style={styles.flagModalOverlay}>
+          <View style={styles.flagModalBox}>
+            <Text style={styles.flagModalTitle}>🚩 Flag Incident</Text>
+            <Text style={styles.flagModalSubtitle}>
+              Help keep the neighborhood safe by reporting inaccurate or problematic content.
+            </Text>
+
+            <Text style={styles.flagInputLabel}>Select Reason *</Text>
+            <View style={styles.reasonOptionGroup}>
+              {(
+                [
+                  { reason: 'FALSE_INFORMATION', label: '❌ False Info' },
+                  { reason: 'SPAM', label: '🚫 Spam' },
+                  { reason: 'DUPLICATE', label: '📑 Duplicate' },
+                  { reason: 'INAPPROPRIATE_CONTENT', label: '⚠️ Inappropriate' },
+                  { reason: 'MISLEADING', label: '❓ Misleading' },
+                  { reason: 'OTHER', label: 'ℹ️ Other' },
+                ] as const
+              ).map((item) => (
+                <TouchableOpacity
+                  key={item.reason}
+                  style={[
+                    styles.reasonOptionChip,
+                    flagReason === item.reason && styles.reasonOptionChipActive,
+                  ]}
+                  onPress={() => setFlagReason(item.reason)}
+                >
+                  <Text
+                    style={[
+                      styles.reasonOptionText,
+                      flagReason === item.reason && styles.reasonOptionTextActive,
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.flagInputLabel}>Additional Details (Optional)</Text>
+            <TextInput
+              style={styles.flagTextInput}
+              placeholder="Explain why this incident should be reviewed..."
+              value={flagDescription}
+              onChangeText={setFlagDescription}
+              multiline
+              numberOfLines={3}
+              placeholderTextColor="#94a3b8"
+            />
+
+            <View style={styles.flagModalButtons}>
+              <TouchableOpacity
+                style={styles.flagCancelBtn}
+                disabled={flagSubmitting}
+                onPress={() => setFlagModalVisible(false)}
+              >
+                <Text style={styles.flagCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.flagSubmitBtn}
+                disabled={flagSubmitting}
+                onPress={handleSubmitFlag}
+              >
+                {flagSubmitting ? (
+                  <ActivityIndicator color="#ffffff" size="small" />
+                ) : (
+                  <Text style={styles.flagSubmitBtnText}>Submit Flag</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -879,5 +1002,104 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     fontStyle: 'italic',
+  },
+  flagModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  flagModalBox: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    padding: 18,
+  },
+  flagModalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginBottom: 4,
+  },
+  flagModalSubtitle: {
+    fontSize: 13,
+    color: '#64748b',
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  flagInputLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#334155',
+    marginBottom: 6,
+    marginTop: 6,
+  },
+  reasonOptionGroup: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 8,
+  },
+  reasonOptionChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  reasonOptionChipActive: {
+    backgroundColor: '#fee2e2',
+    borderColor: '#dc2626',
+  },
+  reasonOptionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  reasonOptionTextActive: {
+    color: '#dc2626',
+    fontWeight: '700',
+  },
+  flagTextInput: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 13,
+    color: '#0f172a',
+    minHeight: 70,
+    textAlignVertical: 'top',
+    marginBottom: 14,
+  },
+  flagModalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
+  flagCancelBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: '#f1f5f9',
+  },
+  flagCancelBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  flagSubmitBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: '#dc2626',
+  },
+  flagSubmitBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#ffffff',
   },
 });

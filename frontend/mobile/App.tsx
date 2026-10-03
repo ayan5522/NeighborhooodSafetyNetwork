@@ -19,6 +19,10 @@ import { AlertDetailsScreen } from './src/screens/AlertDetailsScreen';
 import { EmergencyScreen } from './src/screens/EmergencyScreen';
 import { EmergencyContactsScreen } from './src/screens/EmergencyContactsScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
+import { AdminDashboardScreen } from './src/screens/AdminDashboardScreen';
+import { UserManagementScreen } from './src/screens/UserManagementScreen';
+import { ModerationQueueScreen } from './src/screens/ModerationQueueScreen';
+import { ModerationDetailScreen } from './src/screens/ModerationDetailScreen';
 
 type AuthNavScreen = 'login' | 'register' | 'forgot' | 'otp' | 'reset';
 type MainNavScreen =
@@ -32,7 +36,11 @@ type MainNavScreen =
   | 'alert_details'
   | 'emergency'
   | 'emergency_contacts'
-  | 'notifications';
+  | 'notifications'
+  | 'admin_dashboard'
+  | 'user_management'
+  | 'moderation_queue'
+  | 'moderation_detail';
 
 const NavigationContainer: React.FC = () => {
   const { authenticated, loading } = useAuth();
@@ -40,6 +48,7 @@ const NavigationContainer: React.FC = () => {
   const [mainScreen, setMainScreen] = useState<MainNavScreen>('home');
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [resetFlowState, setResetFlowState] = useState<{
     email: string;
     devOtp?: string;
@@ -151,6 +160,42 @@ const NavigationContainer: React.FC = () => {
         />
       );
     }
+    if (mainScreen === 'admin_dashboard') {
+      return (
+        <AdminDashboardScreen
+          onBack={() => setMainScreen('home')}
+          onNavigateUserManagement={() => setMainScreen('user_management')}
+          onNavigateModerationQueue={() => setMainScreen('moderation_queue')}
+        />
+      );
+    }
+    if (mainScreen === 'user_management') {
+      return (
+        <UserManagementScreen
+          onBack={() => setMainScreen('admin_dashboard')}
+        />
+      );
+    }
+    if (mainScreen === 'moderation_queue') {
+      return (
+        <ModerationQueueScreen
+          onBack={() => setMainScreen('home')}
+          onSelectReport={(id) => {
+            setSelectedReportId(id);
+            setMainScreen('moderation_detail');
+          }}
+        />
+      );
+    }
+    if (mainScreen === 'moderation_detail' && selectedReportId) {
+      return (
+        <ModerationDetailScreen
+          reportId={selectedReportId}
+          onBack={() => setMainScreen('moderation_queue')}
+          onActionComplete={() => setMainScreen('moderation_queue')}
+        />
+      );
+    }
     return (
       <HomeScreen
         onNavigateProfile={() => setMainScreen('profile')}
@@ -160,6 +205,9 @@ const NavigationContainer: React.FC = () => {
         onNavigateAlerts={() => setMainScreen('alerts')}
         onNavigateEmergency={() => setMainScreen('emergency')}
         onNavigateNotifications={() => setMainScreen('notifications')}
+        onNavigateAdminDashboard={() => setMainScreen('admin_dashboard')}
+        onNavigateUserManagement={() => setMainScreen('user_management')}
+        onNavigateModerationQueue={() => setMainScreen('moderation_queue')}
       />
     );
   }

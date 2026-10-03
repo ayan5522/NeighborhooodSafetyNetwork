@@ -20,6 +20,9 @@ interface HomeScreenProps {
   onNavigateAlerts: () => void;
   onNavigateEmergency: () => void;
   onNavigateNotifications: () => void;
+  onNavigateAdminDashboard?: () => void;
+  onNavigateUserManagement?: () => void;
+  onNavigateModerationQueue?: () => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -30,6 +33,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onNavigateAlerts,
   onNavigateEmergency,
   onNavigateNotifications,
+  onNavigateAdminDashboard,
+  onNavigateUserManagement,
+  onNavigateModerationQueue,
 }) => {
   const { user, logout } = useAuth();
   const { unreadCount: unreadNotifCount, isSocketConnected } = useNotifications();
@@ -150,13 +156,85 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </View>
         </Card>
 
+        {/* Module 07: Administrative & Moderation Controls (Role-Protected) */}
+        {user?.role === 'ADMIN' && (
+          <Card>
+            <View style={styles.emergencyCardHeader}>
+              <Text style={[styles.emergencyCardTitle, { color: '#1e3a8a' }]}>
+                🛡️ Administrator Panel
+              </Text>
+              <Text style={[styles.emergencyCardBadge, { backgroundColor: '#dbeafe', color: '#1d4ed8' }]}>
+                ADMIN
+              </Text>
+            </View>
+            <Text style={styles.emergencyCardDesc}>
+              Administrative privileges active: user account governance, role assignment, and moderation oversight.
+            </Text>
+            <View style={{ gap: 8, marginTop: 8 }}>
+              {onNavigateAdminDashboard && (
+                <Button
+                  title="📊 Admin Statistics Dashboard"
+                  onPress={onNavigateAdminDashboard}
+                  variant="primary"
+                />
+              )}
+              {onNavigateUserManagement && (
+                <Button
+                  title="👥 User Management & Roles"
+                  onPress={onNavigateUserManagement}
+                  variant="outline"
+                />
+              )}
+              {onNavigateModerationQueue && (
+                <Button
+                  title="⚖️ Moderation Queue"
+                  onPress={onNavigateModerationQueue}
+                  variant="outline"
+                />
+              )}
+            </View>
+          </Card>
+        )}
+
+        {user?.role === 'MODERATOR' && (
+          <Card>
+            <View style={styles.emergencyCardHeader}>
+              <Text style={[styles.emergencyCardTitle, { color: '#4338ca' }]}>
+                ⚖️ Moderation Panel
+              </Text>
+              <Text style={[styles.emergencyCardBadge, { backgroundColor: '#e0e7ff', color: '#4338ca' }]}>
+                MODERATOR
+              </Text>
+            </View>
+            <Text style={styles.emergencyCardDesc}>
+              Moderator privileges active: review community flags, verify incident authenticity, and resolve queue items.
+            </Text>
+            <View style={{ gap: 8, marginTop: 8 }}>
+              {onNavigateModerationQueue && (
+                <Button
+                  title="⚖️ Open Moderation Queue"
+                  onPress={onNavigateModerationQueue}
+                  variant="primary"
+                />
+              )}
+              {onNavigateAdminDashboard && (
+                <Button
+                  title="📊 Moderation Metrics"
+                  onPress={onNavigateAdminDashboard}
+                  variant="outline"
+                />
+              )}
+            </View>
+          </Card>
+        )}
+
         <Card>
           <Text style={styles.cardTitle}>Neighborhood Safety Network</Text>
           <Text style={styles.networkStatus}>
-            🟢 Modules 1 to 6 Fully Operational
+            🟢 Modules 1 to 7 Fully Operational
           </Text>
           <Text style={styles.networkSubtext}>
-            Auth, PostGIS Location, Incident Reporting, Alerts, Community Verification & Real-Time Notifications.
+            Auth, Location, Incidents, Alerts, Verification, Notifications, Admin & Moderation.
           </Text>
         </Card>
 

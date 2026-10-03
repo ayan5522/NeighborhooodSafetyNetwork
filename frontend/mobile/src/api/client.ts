@@ -4,6 +4,15 @@ import { Incident } from '../types/incident';
 import { Alert, EmergencyContact, SOSEvent } from '../types/alert';
 import { VerificationSummary, VerificationType } from '../types/verification';
 import { NotificationRecord, NotificationsResponse } from '../types/notification';
+import {
+  DashboardStats,
+  UserSummary,
+  ModerationQueueItem,
+  ModerationDetailResponse,
+  IncidentReportRecord,
+  ReportReason,
+  ModerationAction,
+} from '../types/admin';
 
 const getBaseUrl = (): string => {
   if (Platform.OS === 'web') {
@@ -403,5 +412,149 @@ export const markAllNotificationsAsRead = async (): Promise<
     method: 'PATCH',
   });
 };
+
+// Module 07: Admin & Moderation APIs
+
+export const fetchAdminDashboard = async (): Promise<ApiResponse<DashboardStats>> => {
+  return request<DashboardStats>('/admin/dashboard', {
+    method: 'GET',
+  });
+};
+
+export const fetchAdminUsers = async (
+  search?: string,
+  role?: string,
+  status?: string,
+  page: number = 1,
+  limit: number = 20
+): Promise<
+  ApiResponse<{
+    users: UserSummary[];
+    total: number;
+    page: number;
+    limit: number;
+  }>
+> => {
+  const params = new URLSearchParams();
+  if (search) params.append('search', search);
+  if (role) params.append('role', role);
+  if (status) params.append('status', status);
+  params.append('page', page.toString());
+  params.append('limit', limit.toString());
+
+  return request<{
+    users: UserSummary[];
+    total: number;
+    page: number;
+    limit: number;
+  }>(`/admin/users?${params.toString()}`, {
+    method: 'GET',
+  });
+};
+
+export const suspendUser = async (
+  id: string
+): Promise<ApiResponse<{ user: UserSummary }>> => {
+  return request<{ user: UserSummary }>(`/admin/users/${id}/suspend`, {
+    method: 'PATCH',
+  });
+};
+
+export const restoreUser = async (
+  id: string
+): Promise<ApiResponse<{ user: UserSummary }>> => {
+  return request<{ user: UserSummary }>(`/admin/users/${id}/restore`, {
+    method: 'PATCH',
+  });
+};
+
+export const changeUserRole = async (
+  id: string,
+  role: string
+): Promise<ApiResponse<{ user: UserSummary }>> => {
+  return request<{ user: UserSummary }>(`/admin/users/${id}/role`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role }),
+  });
+};
+
+export const reportIncident = async (
+  incidentId: string,
+  reason: ReportReason,
+  description?: string
+): Promise<ApiResponse<{ report: IncidentReportRecord }>> => {
+  return request<{ report: IncidentReportRecord }>(`/incidents/${incidentId}/report`, {
+    method: 'POST',
+    body: JSON.stringify({ reason, description }),
+  });
+};
+
+export const fetchModerationReports = async (
+  status?: string,
+  reason?: string,
+  page: number = 1,
+  limit: number = 20
+): Promise<
+  ApiResponse<{
+    reports: ModerationQueueItem[];
+    total: number;
+    page: number;
+    limit: number;
+  }>
+> => {
+  const params = new URLSearchParams();
+  if (status) params.append('status', status);
+  if (reason) params.append('reason', reason);
+  params.append('page', page.toString());
+  params.append('limit', limit.toString());
+
+  return request<{
+    reports: ModerationQueueItem[];
+    total: number;
+    page: number;
+    limit: number;
+  }>(`/moderation/reports?${params.toString()}`, {
+    method: 'GET',
+  });
+};
+
+export const fetchModerationReportById = async (
+  id: string
+): Promise<ApiResponse<ModerationDetailResponse>> => {
+  return request<ModerationDetailResponse>(`/moderation/reports/${id}`, {
+    method: 'GET',
+  });
+};
+
+export const reviewModerationReport = async (
+  id: string
+): Promise<ApiResponse<{ report: IncidentReportRecord }>> => {
+  return request<{ report: IncidentReportRecord }>(`/moderation/reports/${id}/review`, {
+    method: 'PATCH',
+  });
+};
+
+export const dismissModerationReport = async (
+  id: string
+): Promise<ApiResponse<{ report: IncidentReportRecord }>> => {
+  return request<{ report: IncidentReportRecord }>(`/moderation/reports/${id}/dismiss`, {
+    method: 'PATCH',
+  });
+};
+
+export const takeModerationAction = async (
+  id: string,
+  action: ModerationAction,
+  notes?: string
+): Promise<ApiResponse<{ report: IncidentReportRecord; action: string }>> => {
+  return request<{ report: IncidentReportRecord; action: string }>(
+    `/moderation/reports/${id}/action`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ action, notes }),
+    }
+  );
+};
+
 
 

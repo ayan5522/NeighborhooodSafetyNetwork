@@ -11,6 +11,7 @@ import {
   verifyIncident,
   getIncidentVerifications,
 } from '../controllers/verificationController';
+import { reportIncident } from '../controllers/moderationController';
 import { authenticateJwt } from '../middleware/authMiddleware';
 import { handleUpload } from '../middleware/uploadMiddleware';
 
@@ -26,6 +27,9 @@ router.patch('/:id/cancel', authenticateJwt, cancelIncident);
 // Module 05: Community Verification routes
 router.post('/:id/verify', authenticateJwt, verifyIncident);
 router.get('/:id/verifications', authenticateJwt, getIncidentVerifications);
+
+// Module 07: Community Incident Report / Moderation Flag route
+router.post('/:id/report', authenticateJwt, reportIncident);
 
 export default router;
 

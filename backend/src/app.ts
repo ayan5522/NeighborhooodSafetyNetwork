@@ -11,6 +11,8 @@ import alertRoutes from './routes/alertRoutes';
 import emergencyContactRoutes from './routes/emergencyContactRoutes';
 import sosRoutes from './routes/sosRoutes';
 import notificationRoutes from './routes/notificationRoutes';
+import adminRoutes from './routes/adminRoutes';
+import moderationRoutes from './routes/moderationRoutes';
 import { errorHandler } from './middleware/errorHandler';
 import { notFoundHandler } from './middleware/notFoundHandler';
 
@@ -49,6 +51,8 @@ export const createApp = (): Express => {
   app.use('/api/emergency-contacts', emergencyContactRoutes);
   app.use('/api/sos', sosRoutes);
   app.use('/api/notifications', notificationRoutes);
+  app.use('/api/admin', adminRoutes);
+  app.use('/api/moderation', moderationRoutes);
 
   // Fallthrough 404 handler
   app.use(notFoundHandler);
