@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { NotificationService } from '../services/notificationService';
+import { AuditService } from '../services/auditService';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -145,6 +146,16 @@ export const markAsRead = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
+    AuditService.log({
+      actor_user_id: req.user.id,
+      action: 'NOTIFICATION_READ',
+      entity_type: 'notification',
+      entity_id: id,
+      description: `Notification marked as read: ${id}`,
+      metadata: {},
+      req,
+    });
+
     res.status(200).json({
       success: true,
       data: {
@@ -170,6 +181,17 @@ export const markAllAsRead = async (req: Request, res: Response): Promise<void> 
 
   try {
     const result = await NotificationService.markAllAsRead(req.user.id);
+
+    AuditService.log({
+      actor_user_id: req.user.id,
+      action: 'NOTIFICATIONS_MARKED_READ',
+      entity_type: 'notification',
+      entity_id: null,
+      description: `User marked all notifications as read (${result.updatedCount} updated)`,
+      metadata: { updated_count: result.updatedCount },
+      req,
+    });
+
     res.status(200).json({
       success: true,
       data: {

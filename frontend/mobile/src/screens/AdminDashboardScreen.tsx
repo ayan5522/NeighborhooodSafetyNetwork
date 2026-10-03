@@ -19,12 +19,14 @@ interface AdminDashboardScreenProps {
   onBack: () => void;
   onNavigateUserManagement?: () => void;
   onNavigateModerationQueue: () => void;
+  onNavigateAuditLogs?: () => void;
 }
 
 export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
   onBack,
   onNavigateUserManagement,
   onNavigateModerationQueue,
+  onNavigateAuditLogs,
 }) => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
@@ -126,6 +128,17 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
               {stats?.reports?.pending ? `${stats.reports.pending} Pending Flags` : 'Review Reports'}
             </Text>
           </TouchableOpacity>
+
+          {isAdmin && onNavigateAuditLogs && (
+            <TouchableOpacity
+              style={[styles.actionCard, { backgroundColor: '#0f766e' }]}
+              onPress={onNavigateAuditLogs}
+            >
+              <Text style={styles.actionIcon}>🛡️</Text>
+              <Text style={styles.actionTitle}>Audit Logs</Text>
+              <Text style={styles.actionSubtitle}>Security & Activity Trail</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* User Account Overview (ADMIN only) */}

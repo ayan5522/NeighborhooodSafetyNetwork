@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { ModerationService } from '../services/moderationService';
+import { AuditService } from '../services/auditService';
 
 export const reportIncident = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
@@ -25,6 +26,16 @@ export const reportIncident = async (req: Request, res: Response): Promise<void>
       reason,
       description
     );
+
+    AuditService.log({
+      actor_user_id: req.user.id,
+      action: 'INCIDENT_REPORTED',
+      entity_type: 'moderation_report',
+      entity_id: report.id,
+      description: `Incident reported for moderation: ${reason}`,
+      metadata: { incident_id: incidentId, reason },
+      req,
+    });
 
     res.status(201).json({
       success: true,
@@ -101,6 +112,17 @@ export const reviewReport = async (req: Request, res: Response): Promise<void> =
 
   try {
     const report = await ModerationService.reviewReport(req.user.id, reportId);
+
+    AuditService.log({
+      actor_user_id: req.user.id,
+      action: 'MODERATION_REVIEWED',
+      entity_type: 'moderation_report',
+      entity_id: reportId,
+      description: `Moderation report marked as reviewed`,
+      metadata: { report_id: reportId },
+      req,
+    });
+
     res.status(200).json({
       success: true,
       message: 'Report marked as reviewed',
@@ -125,6 +147,17 @@ export const dismissReport = async (req: Request, res: Response): Promise<void> 
 
   try {
     const report = await ModerationService.dismissReport(req.user.id, reportId);
+
+    AuditService.log({
+      actor_user_id: req.user.id,
+      action: 'MODERATION_DISMISSED',
+      entity_type: 'moderation_report',
+      entity_id: reportId,
+      description: `Moderation report dismissed`,
+      metadata: { report_id: reportId },
+      req,
+    });
+
     res.status(200).json({
       success: true,
       message: 'Report dismissed',
@@ -163,6 +196,16 @@ export const takeAction = async (req: Request, res: Response): Promise<void> => 
       action,
       notes
     );
+
+    AuditService.log({
+      actor_user_id: req.user.id,
+      action: 'MODERATION_ACTION_TAKEN',
+      entity_type: 'moderation_report',
+      entity_id: reportId,
+      description: `Moderation action applied: ${action}`,
+      metadata: { report_id: reportId, action, notes },
+      req,
+    });
 
     res.status(200).json({
       success: true,

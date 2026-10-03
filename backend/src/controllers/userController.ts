@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { query } from '../db';
+import { AuditService } from '../services/auditService';
 
 export const getCurrentUser = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
@@ -66,6 +67,16 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
     });
     return;
   }
+
+  AuditService.log({
+    actor_user_id: req.user.id,
+    action: 'PROFILE_UPDATED',
+    entity_type: 'user',
+    entity_id: req.user.id,
+    description: `User profile updated: ${full_name.trim()}`,
+    metadata: { full_name: full_name.trim() },
+    req,
+  });
 
   res.status(200).json({
     success: true,

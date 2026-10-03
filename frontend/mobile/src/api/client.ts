@@ -13,6 +13,7 @@ import {
   ReportReason,
   ModerationAction,
 } from '../types/admin';
+import { AuditLogRecord, AuditLogsResponse, AuditLogFilters } from '../types/audit';
 
 const getBaseUrl = (): string => {
   if (Platform.OS === 'web') {
@@ -554,6 +555,36 @@ export const takeModerationAction = async (
       body: JSON.stringify({ action, notes }),
     }
   );
+};
+
+// Module 08: Audit Logging APIs (Admin Only)
+
+export const fetchAuditLogs = async (
+  filters: AuditLogFilters = {},
+  page: number = 1,
+  limit: number = 20
+): Promise<ApiResponse<AuditLogsResponse>> => {
+  const params = new URLSearchParams();
+  if (filters.actor_user_id) params.append('actor_user_id', filters.actor_user_id);
+  if (filters.action) params.append('action', filters.action);
+  if (filters.entity_type) params.append('entity_type', filters.entity_type);
+  if (filters.entity_id) params.append('entity_id', filters.entity_id);
+  if (filters.from_date) params.append('from_date', filters.from_date);
+  if (filters.to_date) params.append('to_date', filters.to_date);
+  params.append('page', page.toString());
+  params.append('limit', limit.toString());
+
+  return request<AuditLogsResponse>(`/admin/audit-logs?${params.toString()}`, {
+    method: 'GET',
+  });
+};
+
+export const fetchAuditLogById = async (
+  id: string
+): Promise<ApiResponse<{ log: AuditLogRecord }>> => {
+  return request<{ log: AuditLogRecord }>(`/admin/audit-logs/${id}`, {
+    method: 'GET',
+  });
 };
 
 

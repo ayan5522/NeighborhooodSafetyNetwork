@@ -7,6 +7,7 @@ import {
   AlertStatus,
 } from '../config/alertConfig';
 import { NotificationService } from './notificationService';
+import { AuditService } from './auditService';
 
 export interface AlertIncidentSummary {
   id: string;
@@ -109,6 +110,22 @@ export class AlertService {
       } catch (notifErr) {
         console.warn('Non-blocking notification generation warning:', notifErr);
       }
+    }
+
+    if (res.rows.length > 0) {
+      AuditService.log({
+        actor_user_id: incident.reporter_id,
+        action: 'ALERT_CREATED',
+        entity_type: 'incident',
+        entity_id: incident.id,
+        description: `Dispatched ${res.rows.length} alerts for incident: ${incident.title}`,
+        metadata: {
+          incident_id: incident.id,
+          count: res.rows.length,
+          priority: rule.priority,
+          severity: incident.severity,
+        },
+      });
     }
 
     return res.rows.length;
@@ -307,6 +324,17 @@ export class AlertService {
       } catch (err) {
         console.warn('Non-blocking alert resolution notification warning:', err);
       }
+    }
+
+    if (res.rowCount && res.rowCount > 0) {
+      AuditService.log({
+        actor_user_id: null,
+        action: 'ALERT_RESOLVED',
+        entity_type: 'incident',
+        entity_id: incidentId,
+        description: `Resolved ${res.rowCount} alerts for incident ${incidentId}`,
+        metadata: { incident_id: incidentId, count: res.rowCount },
+      });
     }
 
     return res.rowCount || 0;

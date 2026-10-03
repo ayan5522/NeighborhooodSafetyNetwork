@@ -6,6 +6,7 @@ import {
   restoreUser,
   changeUserRole,
 } from '../controllers/adminController';
+import { getAuditLogs, getAuditLogById } from '../controllers/auditController';
 import { authenticateJwt, requireRole } from '../middleware/authMiddleware';
 
 const router = Router();
@@ -18,5 +19,9 @@ router.get('/users', authenticateJwt, requireRole('ADMIN'), getUsers);
 router.patch('/users/:id/suspend', authenticateJwt, requireRole('ADMIN'), suspendUser);
 router.patch('/users/:id/restore', authenticateJwt, requireRole('ADMIN'), restoreUser);
 router.patch('/users/:id/role', authenticateJwt, requireRole('ADMIN'), changeUserRole);
+
+// Audit logging endpoints strictly restricted to ADMIN
+router.get('/audit-logs', authenticateJwt, requireRole('ADMIN'), getAuditLogs);
+router.get('/audit-logs/:id', authenticateJwt, requireRole('ADMIN'), getAuditLogById);
 
 export default router;

@@ -23,6 +23,7 @@ interface HomeScreenProps {
   onNavigateAdminDashboard?: () => void;
   onNavigateUserManagement?: () => void;
   onNavigateModerationQueue?: () => void;
+  onNavigateAuditLogs?: () => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -36,6 +37,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onNavigateAdminDashboard,
   onNavigateUserManagement,
   onNavigateModerationQueue,
+  onNavigateAuditLogs,
 }) => {
   const { user, logout } = useAuth();
   const { unreadCount: unreadNotifCount, isSocketConnected } = useNotifications();
@@ -192,6 +194,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   variant="outline"
                 />
               )}
+              {onNavigateAuditLogs && (
+                <Button
+                  title="🛡️ Audit & Security Logs"
+                  onPress={onNavigateAuditLogs}
+                  variant="outline"
+                />
+              )}
             </View>
           </Card>
         )}
@@ -231,10 +240,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <Card>
           <Text style={styles.cardTitle}>Neighborhood Safety Network</Text>
           <Text style={styles.networkStatus}>
-            🟢 Modules 1 to 7 Fully Operational
+            🟢 Modules 1 to 8 Fully Operational
           </Text>
           <Text style={styles.networkSubtext}>
-            Auth, Location, Incidents, Alerts, Verification, Notifications, Admin & Moderation.
+            Auth, Location, Incidents, Alerts, Verification, Notifications, Admin & Moderation, Audit Logs & Security Hardening.
           </Text>
         </Card>
 

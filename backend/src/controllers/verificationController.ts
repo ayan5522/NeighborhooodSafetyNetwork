@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { VerificationService } from '../services/verificationService';
 import { IncidentService } from '../services/incidentService';
+import { AuditService } from '../services/auditService';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -66,6 +67,16 @@ export const verifyIncident = async (req: Request, res: Response): Promise<void>
       });
       return;
     }
+
+    AuditService.log({
+      actor_user_id: req.user.id,
+      action: 'INCIDENT_VERIFICATION_CREATED',
+      entity_type: 'incident',
+      entity_id: id,
+      description: `User verified incident (${verification_type})`,
+      metadata: { incident_id: id, verification_type },
+      req,
+    });
 
     res.status(200).json({
       success: true,

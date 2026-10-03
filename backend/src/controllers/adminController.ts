@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { AdminService } from '../services/adminService';
+import { AuditService } from '../services/auditService';
 
 export const getDashboard = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
@@ -68,6 +69,16 @@ export const suspendUser = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
+    AuditService.log({
+      actor_user_id: req.user.id,
+      action: 'USER_SUSPENDED',
+      entity_type: 'user',
+      entity_id: targetUserId,
+      description: `User suspended: ${targetUserId}`,
+      metadata: { target_user_id: targetUserId },
+      req,
+    });
+
     res.status(200).json({
       success: true,
       message: result.message,
@@ -98,6 +109,16 @@ export const restoreUser = async (req: Request, res: Response): Promise<void> =>
       });
       return;
     }
+
+    AuditService.log({
+      actor_user_id: req.user.id,
+      action: 'USER_RESTORED',
+      entity_type: 'user',
+      entity_id: targetUserId,
+      description: `User restored: ${targetUserId}`,
+      metadata: { target_user_id: targetUserId },
+      req,
+    });
 
     res.status(200).json({
       success: true,
@@ -138,6 +159,16 @@ export const changeUserRole = async (req: Request, res: Response): Promise<void>
       });
       return;
     }
+
+    AuditService.log({
+      actor_user_id: req.user.id,
+      action: 'USER_ROLE_CHANGED',
+      entity_type: 'user',
+      entity_id: targetUserId,
+      description: `User role changed to ${role} for ${targetUserId}`,
+      metadata: { target_user_id: targetUserId, new_role: role },
+      req,
+    });
 
     res.status(200).json({
       success: true,

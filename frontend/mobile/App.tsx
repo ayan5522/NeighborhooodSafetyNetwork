@@ -23,6 +23,7 @@ import { AdminDashboardScreen } from './src/screens/AdminDashboardScreen';
 import { UserManagementScreen } from './src/screens/UserManagementScreen';
 import { ModerationQueueScreen } from './src/screens/ModerationQueueScreen';
 import { ModerationDetailScreen } from './src/screens/ModerationDetailScreen';
+import { AuditLogsScreen } from './src/screens/AuditLogsScreen';
 
 type AuthNavScreen = 'login' | 'register' | 'forgot' | 'otp' | 'reset';
 type MainNavScreen =
@@ -40,7 +41,8 @@ type MainNavScreen =
   | 'admin_dashboard'
   | 'user_management'
   | 'moderation_queue'
-  | 'moderation_detail';
+  | 'moderation_detail'
+  | 'audit_logs';
 
 const NavigationContainer: React.FC = () => {
   const { authenticated, loading } = useAuth();
@@ -166,12 +168,20 @@ const NavigationContainer: React.FC = () => {
           onBack={() => setMainScreen('home')}
           onNavigateUserManagement={() => setMainScreen('user_management')}
           onNavigateModerationQueue={() => setMainScreen('moderation_queue')}
+          onNavigateAuditLogs={() => setMainScreen('audit_logs')}
         />
       );
     }
     if (mainScreen === 'user_management') {
       return (
         <UserManagementScreen
+          onBack={() => setMainScreen('admin_dashboard')}
+        />
+      );
+    }
+    if (mainScreen === 'audit_logs') {
+      return (
+        <AuditLogsScreen
           onBack={() => setMainScreen('admin_dashboard')}
         />
       );
@@ -208,6 +218,7 @@ const NavigationContainer: React.FC = () => {
         onNavigateAdminDashboard={() => setMainScreen('admin_dashboard')}
         onNavigateUserManagement={() => setMainScreen('user_management')}
         onNavigateModerationQueue={() => setMainScreen('moderation_queue')}
+        onNavigateAuditLogs={() => setMainScreen('audit_logs')}
       />
     );
   }

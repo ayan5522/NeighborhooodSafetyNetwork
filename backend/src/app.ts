@@ -1,6 +1,7 @@
 import path from 'path';
 import express, { Express } from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import { config } from './config';
 import healthRoutes from './routes/healthRoutes';
 import authRoutes from './routes/authRoutes';
@@ -15,9 +16,21 @@ import adminRoutes from './routes/adminRoutes';
 import moderationRoutes from './routes/moderationRoutes';
 import { errorHandler } from './middleware/errorHandler';
 import { notFoundHandler } from './middleware/notFoundHandler';
+import { generalLimiter, authLimiter, reportLimiter } from './middleware/rateLimiter';
 
 export const createApp = (): Express => {
   const app = express();
+
+  // Security Headers
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      contentSecurityPolicy: false, // Allows cross-origin client rendering for maps and assets
+    })
+  );
+
+  // Global rate limiter
+  app.use(generalLimiter);
 
   // Middleware
   app.use(
@@ -43,13 +56,13 @@ export const createApp = (): Express => {
 
   // API Routes
   app.use('/api', healthRoutes);
-  app.use('/api/auth', authRoutes);
+  app.use('/api/auth', authLimiter, authRoutes);
   app.use('/api/users', userRoutes);
   app.use('/api/location', locationRoutes);
-  app.use('/api/incidents', incidentRoutes);
+  app.use('/api/incidents', reportLimiter, incidentRoutes);
   app.use('/api/alerts', alertRoutes);
   app.use('/api/emergency-contacts', emergencyContactRoutes);
-  app.use('/api/sos', sosRoutes);
+  app.use('/api/sos', reportLimiter, sosRoutes);
   app.use('/api/notifications', notificationRoutes);
   app.use('/api/admin', adminRoutes);
   app.use('/api/moderation', moderationRoutes);

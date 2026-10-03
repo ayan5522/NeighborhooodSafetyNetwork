@@ -4,6 +4,7 @@ import { IncidentService, IncidentCategory, IncidentSeverity } from '../services
 import { LocationService } from '../services/locationService';
 import { AlertService } from '../services/alertService';
 import { VerificationService } from '../services/verificationService';
+import { AuditService } from '../services/auditService';
 
 export const createIncident = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
@@ -65,6 +66,20 @@ export const createIncident = async (req: Request, res: Response): Promise<void>
     } catch (alertError) {
       console.error('Non-blocking alert generation warning:', alertError);
     }
+
+    AuditService.log({
+      actor_user_id: req.user.id,
+      action: 'INCIDENT_CREATED',
+      entity_type: 'incident',
+      entity_id: incident.id,
+      description: `Incident created: ${incident.title} (${incident.category})`,
+      metadata: {
+        category: incident.category,
+        severity: incident.severity,
+        title: incident.title,
+      },
+      req,
+    });
 
     res.status(201).json({
       success: true,
@@ -264,6 +279,16 @@ export const updateIncident = async (req: Request, res: Response): Promise<void>
       return;
     }
 
+    AuditService.log({
+      actor_user_id: req.user.id,
+      action: 'INCIDENT_UPDATED',
+      entity_type: 'incident',
+      entity_id: req.params.id,
+      description: `Incident updated: ${req.params.id}`,
+      metadata: { fields_updated: Object.keys(req.body) },
+      req,
+    });
+
     res.status(200).json({
       success: true,
       data: {
@@ -328,6 +353,16 @@ export const cancelIncident = async (req: Request, res: Response): Promise<void>
     } catch (err) {
       console.error('Non-blocking alert resolution error:', err);
     }
+
+    AuditService.log({
+      actor_user_id: req.user.id,
+      action: 'INCIDENT_CANCELLED',
+      entity_type: 'incident',
+      entity_id: req.params.id,
+      description: `Incident cancelled: ${req.params.id}`,
+      metadata: {},
+      req,
+    });
 
     res.status(200).json({
       success: true,

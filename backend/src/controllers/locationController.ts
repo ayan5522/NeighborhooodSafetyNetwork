@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { LocationService } from '../services/locationService';
+import { AuditService } from '../services/auditService';
 
 export const updateLocation = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
@@ -28,6 +29,16 @@ export const updateLocation = async (req: Request, res: Response): Promise<void>
       longitude,
       accuracy ?? null
     );
+
+    AuditService.log({
+      actor_user_id: req.user.id,
+      action: 'LOCATION_UPDATED',
+      entity_type: 'location',
+      entity_id: req.user.id,
+      description: 'User updated geographical location',
+      metadata: { accuracy: accuracy ?? null },
+      req,
+    });
 
     res.status(200).json({
       success: true,

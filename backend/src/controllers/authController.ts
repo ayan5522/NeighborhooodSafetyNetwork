@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { query } from '../db';
+import { AuditService } from '../services/auditService';
 import {
   hashPassword,
   comparePassword,
@@ -82,6 +83,16 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     role: newUser.role,
   });
 
+  AuditService.log({
+    actor_user_id: newUser.id,
+    action: 'USER_REGISTERED',
+    entity_type: 'user',
+    entity_id: newUser.id,
+    description: `User registered: ${newUser.email}`,
+    metadata: { full_name: newUser.full_name, email: newUser.email, role: newUser.role },
+    req,
+  });
+
   res.status(201).json({
     success: true,
     data: {
@@ -118,6 +129,15 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   );
 
   if (userRes.rows.length === 0) {
+    AuditService.log({
+      actor_user_id: null,
+      action: 'USER_LOGIN_FAILED',
+      entity_type: 'auth',
+      entity_id: null,
+      description: `Failed login attempt for unknown user: ${normalizedEmail}`,
+      metadata: { email: normalizedEmail, reason: 'User not found' },
+      req,
+    });
     res.status(401).json({
       success: false,
       message: 'Invalid email or password',
@@ -129,6 +149,15 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
   // Enforce account status check
   if (user.account_status === 'SUSPENDED') {
+    AuditService.log({
+      actor_user_id: user.id,
+      action: 'USER_LOGIN_FAILED',
+      entity_type: 'auth',
+      entity_id: user.id,
+      description: `Login attempt on suspended account: ${user.email}`,
+      metadata: { email: user.email, reason: 'Account suspended' },
+      req,
+    });
     res.status(403).json({
       success: false,
       message: 'Account is suspended. Please contact support.',
@@ -138,6 +167,15 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
   const passwordMatch = await comparePassword(password, user.password_hash);
   if (!passwordMatch) {
+    AuditService.log({
+      actor_user_id: user.id,
+      action: 'USER_LOGIN_FAILED',
+      entity_type: 'auth',
+      entity_id: user.id,
+      description: `Failed password attempt for user: ${user.email}`,
+      metadata: { email: user.email, reason: 'Invalid password' },
+      req,
+    });
     res.status(401).json({
       success: false,
       message: 'Invalid email or password',
@@ -148,6 +186,16 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   const token = generateJwt({
     user_id: user.id,
     role: user.role,
+  });
+
+  AuditService.log({
+    actor_user_id: user.id,
+    action: 'USER_LOGIN_SUCCESS',
+    entity_type: 'auth',
+    entity_id: user.id,
+    description: `User successfully logged in: ${user.email}`,
+    metadata: { email: user.email, role: user.role },
+    req,
   });
 
   res.status(200).json({
@@ -167,7 +215,17 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   });
 };
 
-export const logout = async (_req: Request, res: Response): Promise<void> => {
+export const logout = async (req: Request, res: Response): Promise<void> => {
+  AuditService.log({
+    actor_user_id: req.user?.id || null,
+    action: 'USER_LOGOUT',
+    entity_type: 'auth',
+    entity_id: req.user?.id || null,
+    description: 'User logged out',
+    metadata: {},
+    req,
+  });
+
   res.status(200).json({
     success: true,
     message: 'Logged out successfully',
@@ -225,6 +283,16 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
   if (process.env.NODE_ENV !== 'production') {
     responseData.dev_otp = otp;
   }
+
+  AuditService.log({
+    actor_user_id: user.id,
+    action: 'PASSWORD_RESET_REQUESTED',
+    entity_type: 'user',
+    entity_id: user.id,
+    description: `Password reset OTP requested for: ${normalizedEmail}`,
+    metadata: { email: normalizedEmail },
+    req,
+  });
 
   res.status(200).json({
     success: true,
@@ -401,6 +469,16 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
     'UPDATE password_resets SET used = true WHERE id = $1',
     [record.id]
   );
+
+  AuditService.log({
+    actor_user_id: record.user_id,
+    action: 'PASSWORD_RESET_COMPLETED',
+    entity_type: 'user',
+    entity_id: record.user_id,
+    description: 'Password reset successfully completed',
+    metadata: {},
+    req,
+  });
 
   res.status(200).json({
     success: true,
