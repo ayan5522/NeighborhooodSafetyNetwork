@@ -14,6 +14,7 @@ import {
   ModerationAction,
 } from '../types/admin';
 import { AuditLogRecord, AuditLogsResponse, AuditLogFilters } from '../types/audit';
+import { AITrustAssessment } from '../types/ai';
 
 const getBaseUrl = (): string => {
   if (Platform.OS === 'web') {
@@ -585,6 +586,21 @@ export const fetchAuditLogById = async (
   return request<{ log: AuditLogRecord }>(`/admin/audit-logs/${id}`, {
     method: 'GET',
   });
+};
+
+// Module 09: AI Trust & Reliability Assessment APIs
+
+export const fetchIncidentTrustScore = async (
+  incidentId: string,
+  refresh: boolean = false
+): Promise<ApiResponse<{ assessment: AITrustAssessment }>> => {
+  const queryParam = refresh ? '?refresh=true' : '';
+  return request<{ assessment: AITrustAssessment }>(
+    `/incidents/${incidentId}/trust-score${queryParam}`,
+    {
+      method: 'GET',
+    }
+  );
 };
 
 

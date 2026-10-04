@@ -12,6 +12,7 @@ import {
   getIncidentVerifications,
 } from '../controllers/verificationController';
 import { reportIncident } from '../controllers/moderationController';
+import { getIncidentTrustScore } from '../controllers/aiTrustController';
 import { authenticateJwt } from '../middleware/authMiddleware';
 import { handleUpload } from '../middleware/uploadMiddleware';
 
@@ -30,6 +31,10 @@ router.get('/:id/verifications', authenticateJwt, getIncidentVerifications);
 
 // Module 07: Community Incident Report / Moderation Flag route
 router.post('/:id/report', authenticateJwt, reportIncident);
+
+// Module 09: AI Trust & Reliability Assessment route
+router.get('/:id/trust-score', authenticateJwt, getIncidentTrustScore);
+router.get('/:id/reliability', authenticateJwt, getIncidentTrustScore);
 
 export default router;
 

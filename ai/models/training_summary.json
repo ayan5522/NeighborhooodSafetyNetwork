@@ -1,0 +1,34 @@
+{
+  "model_version": "trust-model-v1",
+  "feature_version": "v1",
+  "selected_model": "Candidate_GradientBoosting",
+  "validation_results": [
+    {
+      "model": "Baseline_LogisticRegression",
+      "accuracy": 0.9827,
+      "precision": 0.9934,
+      "recall": 0.9784,
+      "f1": 0.9859,
+      "roc_auc": 0.9995
+    },
+    {
+      "model": "Candidate_RandomForest",
+      "accuracy": 0.984,
+      "precision": 0.9934,
+      "recall": 0.9806,
+      "f1": 0.987,
+      "roc_auc": 0.9985
+    },
+    {
+      "model": "Candidate_GradientBoosting",
+      "accuracy": 0.9867,
+      "precision": 0.9935,
+      "recall": 0.9849,
+      "f1": 0.9892,
+      "roc_auc": 0.9991
+    }
+  ],
+  "train_size": 3500,
+  "val_size": 750,
+  "test_size": 750
+}

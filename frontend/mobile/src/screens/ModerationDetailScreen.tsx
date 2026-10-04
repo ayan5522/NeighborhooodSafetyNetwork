@@ -16,15 +16,46 @@ import {
   reviewModerationReport,
   dismissModerationReport,
   takeModerationAction,
+  fetchIncidentTrustScore,
 } from '../api/client';
 import {
   ModerationDetailResponse,
   ModerationAction,
   ReportReason,
 } from '../types/admin';
+import { AITrustAssessment } from '../types/ai';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { CATEGORY_LABELS, SEVERITY_COLORS, IncidentSeverity } from '../types/incident';
+
+const getTrustScoreColor = (category?: string | null) => {
+  switch (category) {
+    case 'VERY_HIGH':
+    case 'HIGH':
+      return '#16a34a';
+    case 'MODERATE':
+      return '#2563eb';
+    case 'LOW':
+      return '#dc2626';
+    default:
+      return '#64748b';
+  }
+};
+
+const getConfidenceColor = (level?: string | null) => {
+  switch (level) {
+    case 'HIGH':
+      return '#16a34a';
+    case 'MEDIUM':
+      return '#2563eb';
+    case 'LOW':
+      return '#d97706';
+    default:
+      return '#64748b';
+  }
+};
+
+
 
 interface ModerationDetailScreenProps {
   reportId: string;
@@ -46,12 +77,34 @@ export const ModerationDetailScreen: React.FC<ModerationDetailScreenProps> = ({
   const [selectedAction, setSelectedAction] = useState<ModerationAction>('RESOLVE_INCIDENT');
   const [actionSubmitting, setActionSubmitting] = useState<boolean>(false);
 
+  // AI Reliability Decision Support state (Module 09)
+  const [aiAssessment, setAiAssessment] = useState<AITrustAssessment | null>(null);
+  const [aiLoading, setAiLoading] = useState<boolean>(false);
+
+  const loadAiTrust = useCallback(async (incidentId: string, refresh: boolean = false) => {
+    setAiLoading(true);
+    try {
+      const aiRes = await fetchIncidentTrustScore(incidentId, refresh);
+      if (aiRes.success && aiRes.data) {
+        setAiAssessment(aiRes.data.assessment);
+      }
+    } catch {
+      // Non-blocking fallback
+    } finally {
+      setAiLoading(false);
+    }
+  }, []);
+
   const loadDetail = useCallback(async () => {
     try {
       setError(null);
       const res = await fetchModerationReportById(reportId);
       if (res.success && res.data) {
         setData(res.data);
+        // Load AI trust score
+        if (res.data.incident?.id) {
+          loadAiTrust(res.data.incident.id, false);
+        }
       } else {
         setError(res.message || 'Failed to load report detail');
       }
@@ -60,11 +113,12 @@ export const ModerationDetailScreen: React.FC<ModerationDetailScreenProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [reportId]);
+  }, [reportId, loadAiTrust]);
 
   useEffect(() => {
     loadDetail();
   }, [loadDetail]);
+
 
   const handleReview = async () => {
     try {
@@ -267,6 +321,136 @@ export const ModerationDetailScreen: React.FC<ModerationDetailScreenProps> = ({
               <Text style={styles.consensusLabel}>Active Alerts</Text>
             </View>
           </View>
+        </Card>
+
+        {/* Module 09: AI Reliability Decision Support Card */}
+        <Card>
+          <View style={styles.aiHeaderRow}>
+            <Text style={styles.sectionHeading}>🤖 AI Reliability Support</Text>
+            <TouchableOpacity
+              onPress={() => loadAiTrust(incident.id, true)}
+              disabled={aiLoading}
+              style={styles.aiRefreshBtn}
+            >
+              <Text style={styles.aiRefreshBtnText}>
+                {aiLoading ? 'Analyzing...' : '↻ Recalculate'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {aiLoading && !aiAssessment ? (
+            <View style={styles.aiLoadingBox}>
+              <ActivityIndicator size="small" color="#4338ca" />
+              <Text style={styles.aiLoadingText}>Running AI trust assessment...</Text>
+            </View>
+          ) : !aiAssessment ? (
+            <View style={styles.aiEmptyBox}>
+              <Text style={styles.aiEmptyText}>AI assessment unavailable for this report.</Text>
+            </View>
+          ) : aiAssessment.confidence_level === 'UNAVAILABLE' ? (
+            <View style={styles.aiEmptyBox}>
+              <Text style={styles.aiEmptyTitle}>Engine Offline</Text>
+              <Text style={styles.aiEmptyText}>
+                {aiAssessment.explanation?.[0] || 'The AI reliability engine is offline. Proceed with standard manual review.'}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.aiContentContainer}>
+              {/* Score and Category Row */}
+              <View style={styles.aiScoreRow}>
+                <View
+                  style={[
+                    styles.aiScoreCircle,
+                    { borderColor: getTrustScoreColor(aiAssessment.trust_category) },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.aiScoreValue,
+                      { color: getTrustScoreColor(aiAssessment.trust_category) },
+                    ]}
+                  >
+                    {aiAssessment.trust_score !== null ? Math.round(aiAssessment.trust_score) : '—'}
+                  </Text>
+                  <Text style={styles.aiScoreMax}>/ 100</Text>
+                </View>
+
+                <View style={styles.aiBadgeCol}>
+                  <View style={styles.aiBadgeRow}>
+                    <Text style={styles.aiBadgeLabel}>Trust Category:</Text>
+                    <View
+                      style={[
+                        styles.aiCategoryBadge,
+                        { backgroundColor: `${getTrustScoreColor(aiAssessment.trust_category)}15` },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.aiCategoryBadgeText,
+                          { color: getTrustScoreColor(aiAssessment.trust_category) },
+                        ]}
+                      >
+                        {aiAssessment.trust_category ? aiAssessment.trust_category.replace(/_/g, ' ') : 'N/A'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.aiBadgeRow}>
+                    <Text style={styles.aiBadgeLabel}>Confidence:</Text>
+                    <View
+                      style={[
+                        styles.aiCategoryBadge,
+                        { backgroundColor: `${getConfidenceColor(aiAssessment.confidence_level)}15` },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.aiCategoryBadgeText,
+                          { color: getConfidenceColor(aiAssessment.confidence_level) },
+                        ]}
+                      >
+                        {aiAssessment.confidence_level}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              {/* Cold Start Notice */}
+              {aiAssessment.confidence_level === 'LOW' && (
+                <View style={styles.aiColdStartBanner}>
+                  <Text style={styles.aiColdStartTitle}>⚠️ Cold Start Warning</Text>
+                  <Text style={styles.aiColdStartText}>
+                    Limited community verification available yet. Treat this score with caution.
+                  </Text>
+                </View>
+              )}
+
+              {/* Factors */}
+              {aiAssessment.explanation && aiAssessment.explanation.length > 0 && (
+                <View style={styles.aiFactorsSection}>
+                  <Text style={styles.aiFactorsHeading}>Top Contributing Signals:</Text>
+                  {aiAssessment.explanation.map((factor: string, idx: number) => (
+                    <View key={idx} style={styles.aiFactorItem}>
+                      <Text style={styles.aiFactorBullet}>•</Text>
+                      <Text style={styles.aiFactorText}>{factor}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+
+              {/* Ethical advisory footer */}
+              <View style={styles.aiMetaFooter}>
+                <Text style={styles.aiMetaText}>
+                  Model: {aiAssessment.model_version} • Pipeline: {aiAssessment.feature_version}
+                </Text>
+                <Text style={styles.aiDisclaimerText}>
+                  Decision support only. Automated predictions never replace human moderator discernment.
+                </Text>
+              </View>
+            </View>
+          )}
         </Card>
 
         {/* Action Controls */}
@@ -648,5 +832,182 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#ffffff',
+  },
+  /* Module 09: AI Decision Support Styles */
+  aiHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  aiRefreshBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  aiRefreshBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#4338ca',
+  },
+  aiLoadingBox: {
+    paddingVertical: 18,
+    alignItems: 'center',
+  },
+  aiLoadingText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#64748b',
+  },
+  aiEmptyBox: {
+    padding: 12,
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  aiEmptyTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
+    marginBottom: 4,
+  },
+  aiEmptyText: {
+    fontSize: 12,
+    color: '#64748b',
+    lineHeight: 18,
+  },
+  aiContentContainer: {
+    gap: 12,
+  },
+  aiScoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  aiScoreCircle: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    borderWidth: 3,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+  },
+  aiScoreValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    lineHeight: 26,
+  },
+  aiScoreMax: {
+    fontSize: 10,
+    color: '#94a3b8',
+    fontWeight: '600',
+  },
+  aiBadgeCol: {
+    flex: 1,
+    gap: 6,
+  },
+  aiBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  aiBadgeLabel: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '600',
+    width: 95,
+  },
+  aiCategoryBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  aiCategoryBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  aiColdStartBanner: {
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fef3c7',
+  },
+  aiColdStartTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#b45309',
+    marginBottom: 2,
+  },
+  aiColdStartText: {
+    fontSize: 11,
+    color: '#92400e',
+    lineHeight: 16,
+  },
+  aiSummaryBox: {
+    padding: 10,
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#4338ca',
+  },
+  aiSummaryText: {
+    fontSize: 12,
+    color: '#334155',
+    lineHeight: 18,
+    fontStyle: 'italic',
+  },
+  aiFactorsSection: {
+    backgroundColor: '#ffffff',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  aiFactorsHeading: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 6,
+  },
+  aiFactorItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginBottom: 4,
+  },
+  aiFactorBullet: {
+    fontSize: 12,
+    color: '#4338ca',
+    fontWeight: 'bold',
+  },
+  aiFactorText: {
+    fontSize: 12,
+    color: '#475569',
+    flex: 1,
+    lineHeight: 17,
+  },
+  aiMetaFooter: {
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    gap: 4,
+  },
+  aiMetaText: {
+    fontSize: 10,
+    color: '#94a3b8',
+    fontWeight: '500',
+  },
+  aiDisclaimerText: {
+    fontSize: 10,
+    color: '#64748b',
+    lineHeight: 14,
+    fontStyle: 'italic',
   },
 });

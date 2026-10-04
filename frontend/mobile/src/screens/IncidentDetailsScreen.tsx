@@ -21,8 +21,10 @@ import {
   verifyIncident,
   fetchIncidentVerifications,
   reportIncident,
+  fetchIncidentTrustScore,
 } from '../api/client';
 import { ReportReason } from '../types/admin';
+import { AITrustAssessment } from '../types/ai';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import {
@@ -58,6 +60,35 @@ const CATEGORIES: IncidentCategory[] = [
 
 const SEVERITIES: IncidentSeverity[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
+const getTrustScoreColor = (category?: string | null) => {
+  switch (category) {
+    case 'VERY_HIGH':
+    case 'HIGH':
+      return '#16a34a';
+    case 'MODERATE':
+      return '#2563eb';
+    case 'LOW':
+      return '#dc2626';
+    default:
+      return '#64748b';
+  }
+};
+
+const getConfidenceColor = (level?: string | null) => {
+  switch (level) {
+    case 'HIGH':
+      return '#16a34a';
+    case 'MEDIUM':
+      return '#2563eb';
+    case 'LOW':
+      return '#d97706';
+    default:
+      return '#64748b';
+  }
+};
+
+
+
 export const IncidentDetailsScreen: React.FC<IncidentDetailsScreenProps> = ({
   incidentId,
   onBack,
@@ -79,12 +110,30 @@ export const IncidentDetailsScreen: React.FC<IncidentDetailsScreenProps> = ({
   const [flagDescription, setFlagDescription] = useState('');
   const [flagSubmitting, setFlagSubmitting] = useState(false);
 
+  // AI Reliability state (Module 09)
+  const [aiAssessment, setAiAssessment] = useState<AITrustAssessment | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editCategory, setEditCategory] = useState<IncidentCategory>('ACCIDENT');
   const [editSeverity, setEditSeverity] = useState<IncidentSeverity>('MEDIUM');
+
+  const loadAiTrust = useCallback(async (refresh: boolean = false) => {
+    setAiLoading(true);
+    try {
+      const aiRes = await fetchIncidentTrustScore(incidentId, refresh);
+      if (aiRes.success && aiRes.data) {
+        setAiAssessment(aiRes.data.assessment);
+      }
+    } catch {
+      // Graceful non-blocking fallback
+    } finally {
+      setAiLoading(false);
+    }
+  }, [incidentId]);
 
   const loadDetails = useCallback(async () => {
     try {
@@ -106,6 +155,9 @@ export const IncidentDetailsScreen: React.FC<IncidentDetailsScreenProps> = ({
             setVerification(vRes.data);
           }
         }
+
+        // Fetch AI Reliability assessment
+        loadAiTrust(false);
       } else {
         setError(res.message || 'Incident not found');
       }
@@ -114,7 +166,7 @@ export const IncidentDetailsScreen: React.FC<IncidentDetailsScreenProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [incidentId]);
+  }, [incidentId, loadAiTrust]);
 
   useEffect(() => {
     loadDetails();
@@ -202,6 +254,7 @@ export const IncidentDetailsScreen: React.FC<IncidentDetailsScreenProps> = ({
       const res = await verifyIncident(incidentId, type);
       if (res.success && res.data) {
         setVerification(res.data);
+        loadAiTrust(true);
       } else {
         Alert.alert('Verification Failed', res.message || 'Could not submit verification.');
       }
@@ -533,6 +586,133 @@ export const IncidentDetailsScreen: React.FC<IncidentDetailsScreenProps> = ({
           <Text style={styles.verificationDisclaimer}>
             Community verification reflects responses from local residents. It does not independently establish factual truth.
           </Text>
+        </Card>
+
+        {/* Module 09: AI Trust & Reliability Assessment */}
+        <Card>
+          <View style={styles.aiHeaderRow}>
+            <Text style={styles.sectionTitle}>🤖 AI Reliability Assessment</Text>
+            <TouchableOpacity
+              onPress={() => loadAiTrust(true)}
+              disabled={aiLoading}
+              style={styles.aiRefreshBtn}
+            >
+              <Text style={styles.aiRefreshBtnText}>{aiLoading ? 'Analyzing...' : '↻ Recalculate'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {aiLoading && !aiAssessment ? (
+            <View style={styles.aiLoadingBox}>
+              <ActivityIndicator size="small" color="#2563eb" />
+              <Text style={styles.aiLoadingText}>Analyzing incident reliability...</Text>
+            </View>
+          ) : !aiAssessment ? (
+            <View style={styles.aiEmptyBox}>
+              <Text style={styles.aiEmptyText}>AI reliability assessment unavailable at this time.</Text>
+            </View>
+          ) : aiAssessment.confidence_level === 'UNAVAILABLE' ? (
+            <View style={styles.aiEmptyBox}>
+              <Text style={styles.aiEmptyTitle}>Assessment Offline</Text>
+              <Text style={styles.aiEmptyText}>
+                {aiAssessment.explanation?.[0] || 'The AI reliability engine is currently unavailable. Incident moderation and community verifications remain fully active.'}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.aiContentContainer}>
+              {/* Score and Badges Row */}
+              <View style={styles.aiScoreRow}>
+                <View
+                  style={[
+                    styles.aiScoreCircle,
+                    { borderColor: getTrustScoreColor(aiAssessment.trust_category) },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.aiScoreValue,
+                      { color: getTrustScoreColor(aiAssessment.trust_category) },
+                    ]}
+                  >
+                    {aiAssessment.trust_score !== null ? Math.round(aiAssessment.trust_score) : '—'}
+                  </Text>
+                  <Text style={styles.aiScoreMax}>/ 100</Text>
+                </View>
+
+                <View style={styles.aiBadgeCol}>
+                  <View style={styles.aiBadgeRow}>
+                    <Text style={styles.aiBadgeLabel}>Category:</Text>
+                    <View
+                      style={[
+                        styles.aiCategoryBadge,
+                        { backgroundColor: `${getTrustScoreColor(aiAssessment.trust_category)}15` },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.aiCategoryBadgeText,
+                          { color: getTrustScoreColor(aiAssessment.trust_category) },
+                        ]}
+                      >
+                        {aiAssessment.trust_category ? aiAssessment.trust_category.replace(/_/g, ' ') : 'N/A'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.aiBadgeRow}>
+                    <Text style={styles.aiBadgeLabel}>Confidence:</Text>
+                    <View
+                      style={[
+                        styles.aiCategoryBadge,
+                        { backgroundColor: `${getConfidenceColor(aiAssessment.confidence_level)}15` },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.aiCategoryBadgeText,
+                          { color: getConfidenceColor(aiAssessment.confidence_level) },
+                        ]}
+                      >
+                        {aiAssessment.confidence_level}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              {/* Cold-Start Banner if confidence is LOW */}
+              {aiAssessment.confidence_level === 'LOW' && (
+                <View style={styles.aiColdStartBanner}>
+                  <Text style={styles.aiColdStartTitle}>⚠️ Preliminary Assessment (Cold Start)</Text>
+                  <Text style={styles.aiColdStartText}>
+                    Few community members have voted on this incident yet. As neighbors confirm or dispute, confidence and score precision will adjust.
+                  </Text>
+                </View>
+              )}
+
+              {/* Explanations list */}
+              {aiAssessment.explanation && aiAssessment.explanation.length > 0 && (
+                <View style={styles.aiFactorsSection}>
+                  <Text style={styles.aiFactorsHeading}>Key Contributing Signals:</Text>
+                  {aiAssessment.explanation.map((factor: string, idx: number) => (
+                    <View key={idx} style={styles.aiFactorItem}>
+                      <Text style={styles.aiFactorBullet}>•</Text>
+                      <Text style={styles.aiFactorText}>{factor}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Meta & Disclaimer Footer */}
+              <View style={styles.aiMetaFooter}>
+                <Text style={styles.aiMetaText}>
+                  Model: {aiAssessment.model_version} • Features: {aiAssessment.feature_version}
+                </Text>
+                <Text style={styles.aiDisclaimerText}>
+                  Advisory only. The AI model assists decision-making and does not substitute for human moderation or official emergency response.
+                </Text>
+              </View>
+            </View>
+          )}
         </Card>
 
         {/* Location & Reporter Info */}
@@ -1102,4 +1282,182 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#ffffff',
   },
+  /* Module 09: AI Reliability Styles */
+  aiHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  aiRefreshBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  aiRefreshBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#2563eb',
+  },
+  aiLoadingBox: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  aiLoadingText: {
+    marginTop: 8,
+    fontSize: 13,
+    color: '#64748b',
+  },
+  aiEmptyBox: {
+    padding: 12,
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  aiEmptyTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
+    marginBottom: 4,
+  },
+  aiEmptyText: {
+    fontSize: 12,
+    color: '#64748b',
+    lineHeight: 18,
+  },
+  aiContentContainer: {
+    gap: 12,
+  },
+  aiScoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  aiScoreCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 3,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+  },
+  aiScoreValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    lineHeight: 26,
+  },
+  aiScoreMax: {
+    fontSize: 10,
+    color: '#94a3b8',
+    fontWeight: '600',
+  },
+  aiBadgeCol: {
+    flex: 1,
+    gap: 6,
+  },
+  aiBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  aiBadgeLabel: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '600',
+    width: 75,
+  },
+  aiCategoryBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  aiCategoryBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  aiColdStartBanner: {
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fef3c7',
+  },
+  aiColdStartTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#b45309',
+    marginBottom: 2,
+  },
+  aiColdStartText: {
+    fontSize: 11,
+    color: '#92400e',
+    lineHeight: 16,
+  },
+  aiSummaryBox: {
+    padding: 10,
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#2563eb',
+  },
+  aiSummaryText: {
+    fontSize: 13,
+    color: '#334155',
+    lineHeight: 18,
+    fontStyle: 'italic',
+  },
+  aiFactorsSection: {
+    backgroundColor: '#ffffff',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  aiFactorsHeading: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 6,
+  },
+  aiFactorItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginBottom: 4,
+  },
+  aiFactorBullet: {
+    fontSize: 12,
+    color: '#2563eb',
+    fontWeight: 'bold',
+  },
+  aiFactorText: {
+    fontSize: 12,
+    color: '#475569',
+    flex: 1,
+    lineHeight: 17,
+  },
+  aiMetaFooter: {
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    gap: 4,
+  },
+  aiMetaText: {
+    fontSize: 10,
+    color: '#94a3b8',
+    fontWeight: '500',
+  },
+  aiDisclaimerText: {
+    fontSize: 10,
+    color: '#64748b',
+    lineHeight: 14,
+    fontStyle: 'italic',
+  },
 });
+
