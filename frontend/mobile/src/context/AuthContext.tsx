@@ -17,13 +17,17 @@ interface AuthContextType {
   token: string | null;
   loading: boolean;
   authenticated: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  login: (
+    email: string,
+    password: string
+  ) => Promise<{ success: boolean; message?: string; unverified?: boolean; email?: string }>;
   register: (
     full_name: string,
     email: string,
     password: string,
     confirm_password: string
-  ) => Promise<{ success: boolean; message?: string }>;
+  ) => Promise<{ success: boolean; message?: string; email?: string }>;
+  setAuthSession: (authToken: string, loggedInUser: User) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (full_name: string) => Promise<{ success: boolean; message?: string }>;
 }
@@ -66,7 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string) => {
     const res = await loginUser({ email, password });
-    if (res.success && res.data) {
+    if (res.success && res.data?.token && res.data?.user) {
       const { user: loggedInUser, token: authToken } = res.data;
       await storage.setItem(TOKEN_KEY, authToken);
       setAuthToken(authToken);
@@ -74,7 +78,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(authToken);
       return { success: true };
     }
-    return { success: false, message: res.message || 'Login failed' };
+
+    const isUnverified =
+      (res.message && res.message.toLowerCase().includes('verify')) ||
+      res.data?.email_verified === false;
+
+    return {
+      success: false,
+      message: res.message || 'Login failed',
+      unverified: isUnverified,
+      email: res.data?.email || email.trim(),
+    };
   };
 
   const register = async (
@@ -89,15 +103,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       password,
       confirm_password,
     });
-    if (res.success && res.data) {
-      const { user: registeredUser, token: authToken } = res.data;
-      await storage.setItem(TOKEN_KEY, authToken);
-      setAuthToken(authToken);
-      setUser(registeredUser);
-      setToken(authToken);
-      return { success: true };
+    if (res.success) {
+      return { success: true, email: res.data?.email || email.trim() };
     }
     return { success: false, message: res.message || 'Registration failed' };
+  };
+
+  const setAuthSession = async (authToken: string, loggedInUser: User) => {
+    await storage.setItem(TOKEN_KEY, authToken);
+    setAuthToken(authToken);
+    setUser(loggedInUser);
+    setToken(authToken);
   };
 
   const logout = async () => {
@@ -130,6 +146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         authenticated: !!user && !!token,
         login,
         register,
+        setAuthSession,
         logout,
         updateUser,
       }}

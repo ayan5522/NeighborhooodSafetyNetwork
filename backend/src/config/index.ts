@@ -43,4 +43,18 @@ export const config = {
     minRadiusMeters: 100,
     maxRadiusMeters: 10000,
   },
+  smtp: {
+    host: process.env.SMTP_HOST || '',
+    port: parseInt(process.env.SMTP_PORT || '587', 10),
+    secure: process.env.SMTP_SECURE === 'true',
+    user: process.env.SMTP_USER || '',
+    password: process.env.SMTP_PASSWORD || '',
+    from: process.env.SMTP_FROM || 'Neighborhood Safety Network <noreply@neighborhoodsafety.org>',
+  },
+  otp: {
+    expiryMinutes: parseInt(process.env.OTP_EXPIRY_MINUTES || '5', 10),
+    maxAttempts: parseInt(process.env.OTP_MAX_ATTEMPTS || '5', 10),
+    resendCooldownSeconds: parseInt(process.env.OTP_RESEND_COOLDOWN_SECONDS || '60', 10),
+    resetTokenExpiryMinutes: parseInt(process.env.RESET_TOKEN_EXPIRY_MINUTES || '15', 10),
+  },
 };

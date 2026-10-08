@@ -74,13 +74,12 @@ describe('Module 10: Complete End-to-End System Integration & Regression Suite',
       expect(res.body.success).toBe(true);
       expect(res.body.data.user.email).toBe('usera@mod10.test');
       expect(res.body.data.user.role).toBe('RESIDENT');
-      expect(res.body.data.user.account_status).toBe('ACTIVE');
+      expect(res.body.data.user.account_status).toBe('PENDING');
       expect(res.body.data.user.password).toBeUndefined();
       expect(res.body.data.user.password_hash).toBeUndefined();
-      expect(res.body.data.token).toBeDefined();
 
       userAId = res.body.data.user.id;
-      userAToken = res.body.data.token;
+      await query("UPDATE users SET email_verified = true, account_status = 'ACTIVE' WHERE id = $1", [userAId]);
     });
 
     it('Rejects duplicate email registration with 409', async () => {
@@ -120,7 +119,9 @@ describe('Module 10: Complete End-to-End System Integration & Regression Suite',
         confirm_password: 'Password123!',
       });
       userBId = bRes.body.data.user.id;
-      userBToken = bRes.body.data.token;
+      await query("UPDATE users SET email_verified = true, account_status = 'ACTIVE' WHERE id = $1", [userBId]);
+      const bLogin = await request(app).post('/api/auth/login').send({ email: 'userb@mod10.test', password: 'Password123!' });
+      userBToken = bLogin.body.data.token;
 
       // User C (Resident)
       const cRes = await request(app).post('/api/auth/register').send({
@@ -130,7 +131,9 @@ describe('Module 10: Complete End-to-End System Integration & Regression Suite',
         confirm_password: 'Password123!',
       });
       userCId = cRes.body.data.user.id;
-      userCToken = cRes.body.data.token;
+      await query("UPDATE users SET email_verified = true, account_status = 'ACTIVE' WHERE id = $1", [userCId]);
+      const cLogin = await request(app).post('/api/auth/login').send({ email: 'userc@mod10.test', password: 'Password123!' });
+      userCToken = cLogin.body.data.token;
 
       // User D (Resident)
       const dRes = await request(app).post('/api/auth/register').send({
@@ -140,7 +143,9 @@ describe('Module 10: Complete End-to-End System Integration & Regression Suite',
         confirm_password: 'Password123!',
       });
       userDId = dRes.body.data.user.id;
-      userDToken = dRes.body.data.token;
+      await query("UPDATE users SET email_verified = true, account_status = 'ACTIVE' WHERE id = $1", [userDId]);
+      const dLogin = await request(app).post('/api/auth/login').send({ email: 'userd@mod10.test', password: 'Password123!' });
+      userDToken = dLogin.body.data.token;
 
       // Moderator
       const modRes = await request(app).post('/api/auth/register').send({
@@ -150,7 +155,7 @@ describe('Module 10: Complete End-to-End System Integration & Regression Suite',
         confirm_password: 'Password123!',
       });
       modId = modRes.body.data.user.id;
-      await query("UPDATE users SET role = 'MODERATOR' WHERE id = $1", [modId]);
+      await query("UPDATE users SET role = 'MODERATOR', email_verified = true, account_status = 'ACTIVE' WHERE id = $1", [modId]);
       const modLogin = await request(app).post('/api/auth/login').send({
         email: 'mod@mod10.test',
         password: 'Password123!',
@@ -165,7 +170,7 @@ describe('Module 10: Complete End-to-End System Integration & Regression Suite',
         confirm_password: 'Password123!',
       });
       adminId = adminRes.body.data.user.id;
-      await query("UPDATE users SET role = 'ADMIN' WHERE id = $1", [adminId]);
+      await query("UPDATE users SET role = 'ADMIN', email_verified = true, account_status = 'ACTIVE' WHERE id = $1", [adminId]);
       const adminLogin = await request(app).post('/api/auth/login').send({
         email: 'admin@mod10.test',
         password: 'Password123!',

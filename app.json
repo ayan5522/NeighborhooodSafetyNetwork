@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "211763d9-cd99-4663-a4bc-03a952e7299d"
+      }
+    },
+    "android": {
+      "package": "com.ayanmn.neighborhoodsafetynetwork"
+    }
+  }
+}

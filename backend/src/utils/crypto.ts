@@ -49,11 +49,26 @@ export const verifyJwt = (token: string): TokenPayload => {
 };
 
 export const generateOtp = (): string => {
-  // Cryptographically secure 6-digit random number
-  const num = crypto.randomInt(100000, 999999);
+  // Cryptographically secure 6-digit random number (100000 - 999999 inclusive)
+  const num = crypto.randomInt(100000, 1000000);
   return num.toString();
+};
+
+export const hashOtp = (otp: string): string => {
+  return crypto.createHash('sha256').update(otp.trim()).digest('hex');
+};
+
+export const verifyOtpHash = (otp: string, storedHash: string): boolean => {
+  const computed = hashOtp(otp);
+  if (computed.length !== storedHash.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(storedHash));
 };
 
 export const generateResetToken = (): string => {
   return crypto.randomBytes(32).toString('hex');
 };
+
+export const hashResetToken = (token: string): string => {
+  return crypto.createHash('sha256').update(token.trim()).digest('hex');
+};
+

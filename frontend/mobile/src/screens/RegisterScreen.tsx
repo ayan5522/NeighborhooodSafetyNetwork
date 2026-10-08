@@ -15,9 +15,13 @@ import { Card } from '../components/Card';
 
 interface RegisterScreenProps {
   onNavigateLogin: () => void;
+  onNavigateVerifyEmail: (email: string) => void;
 }
 
-export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onNavigateLogin }) => {
+export const RegisterScreen: React.FC<RegisterScreenProps> = ({
+  onNavigateLogin,
+  onNavigateVerifyEmail,
+}) => {
   const { register } = useAuth();
   const [fullName, setFullName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
@@ -29,8 +33,8 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onNavigateLogin 
   const handleRegister = async () => {
     setErrorMessage(null);
 
-    if (!fullName.trim()) {
-      setErrorMessage('Full name is required.');
+    if (!fullName.trim() || fullName.trim().length < 2) {
+      setErrorMessage('Full name must be at least 2 characters long.');
       return;
     }
 
@@ -58,7 +62,9 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onNavigateLogin 
     );
     setLoading(false);
 
-    if (!result.success) {
+    if (result.success && result.email) {
+      onNavigateVerifyEmail(result.email);
+    } else {
       setErrorMessage(result.message || 'Registration failed.');
     }
   };

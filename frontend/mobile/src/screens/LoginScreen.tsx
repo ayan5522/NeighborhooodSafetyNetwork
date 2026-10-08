@@ -16,20 +16,24 @@ import { Card } from '../components/Card';
 interface LoginScreenProps {
   onNavigateRegister: () => void;
   onNavigateForgotPassword: () => void;
+  onNavigateVerifyEmail: (email: string) => void;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
   onNavigateRegister,
   onNavigateForgotPassword,
+  onNavigateVerifyEmail,
 }) => {
   const { login } = useAuth();
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
 
   const handleLogin = async () => {
     setErrorMessage(null);
+    setUnverifiedEmail(null);
 
     if (!email.trim() || !password) {
       setErrorMessage('Please enter both email and password.');
@@ -41,7 +45,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     setLoading(false);
 
     if (!result.success) {
-      setErrorMessage(result.message || 'Login failed.');
+      if (result.unverified) {
+        setUnverifiedEmail(result.email || email.trim());
+        setErrorMessage(result.message || 'Please verify your email address before logging in.');
+      } else {
+        setErrorMessage(result.message || 'Login failed.');
+      }
     }
   };
 
@@ -60,6 +69,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           {errorMessage && (
             <View style={styles.errorBanner}>
               <Text style={styles.errorBannerText}>{errorMessage}</Text>
+              {unverifiedEmail && (
+                <TouchableOpacity
+                  style={styles.verifyNowButton}
+                  onPress={() => onNavigateVerifyEmail(unverifiedEmail)}
+                >
+                  <Text style={styles.verifyNowText}>Verify Email Now →</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
 
@@ -143,6 +160,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     fontWeight: '500',
+  },
+  verifyNowButton: {
+    marginTop: 8,
+    alignSelf: 'center',
+    backgroundColor: '#b91c1c',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  verifyNowText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
   },
   forgotButton: {
     alignSelf: 'flex-end',

@@ -37,7 +37,9 @@ describe('Module 09: AI Trust & Reliability Engine Tests', () => {
         confirm_password: 'Password123!',
       });
     reporterUserId = repRes.body.data.user.id;
-    reporterToken = repRes.body.data.token;
+    await query("UPDATE users SET email_verified = true, account_status = 'ACTIVE' WHERE id = $1", [reporterUserId]);
+    const repLogin = await request(app).post('/api/auth/login').send({ email: 'reporter@mod9test.com', password: 'Password123!' });
+    reporterToken = repLogin.body.data.token;
 
     // 2. Register neighbor 1
     const n1Res = await request(app)
@@ -49,7 +51,9 @@ describe('Module 09: AI Trust & Reliability Engine Tests', () => {
         confirm_password: 'Password123!',
       });
     neighbor1UserId = n1Res.body.data.user.id;
-    neighbor1Token = n1Res.body.data.token;
+    await query("UPDATE users SET email_verified = true, account_status = 'ACTIVE' WHERE id = $1", [neighbor1UserId]);
+    const n1Login = await request(app).post('/api/auth/login').send({ email: 'neighbor1@mod9test.com', password: 'Password123!' });
+    neighbor1Token = n1Login.body.data.token;
 
     // 3. Register neighbor 2
     const n2Res = await request(app)
@@ -60,7 +64,10 @@ describe('Module 09: AI Trust & Reliability Engine Tests', () => {
         password: 'Password123!',
         confirm_password: 'Password123!',
       });
-    neighbor2Token = n2Res.body.data.token;
+    const neighbor2UserId = n2Res.body.data.user.id;
+    await query("UPDATE users SET email_verified = true, account_status = 'ACTIVE' WHERE id = $1", [neighbor2UserId]);
+    const n2Login = await request(app).post('/api/auth/login').send({ email: 'neighbor2@mod9test.com', password: 'Password123!' });
+    neighbor2Token = n2Login.body.data.token;
 
     // 4. Create an incident for testing
     const incRes = await request(app)

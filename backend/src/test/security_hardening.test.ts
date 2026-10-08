@@ -39,7 +39,7 @@ describe('Module 08: Audit Logging, Security Hardening & RBAC Tests', () => {
       });
     adminUserId = adminRes.body.data.user.id;
     // Upgrade to ADMIN
-    await query("UPDATE users SET role = 'ADMIN' WHERE id = $1", [adminUserId]);
+    await query("UPDATE users SET role = 'ADMIN', email_verified = true, account_status = 'ACTIVE' WHERE id = $1", [adminUserId]);
 
     const adminLoginRes = await request(app)
       .post('/api/auth/login')
@@ -59,7 +59,7 @@ describe('Module 08: Audit Logging, Security Hardening & RBAC Tests', () => {
         confirm_password: 'Password123!',
       });
     moderatorUserId = modRes.body.data.user.id;
-    await query("UPDATE users SET role = 'MODERATOR' WHERE id = $1", [moderatorUserId]);
+    await query("UPDATE users SET role = 'MODERATOR', email_verified = true, account_status = 'ACTIVE' WHERE id = $1", [moderatorUserId]);
 
     const modLoginRes = await request(app)
       .post('/api/auth/login')
@@ -79,7 +79,12 @@ describe('Module 08: Audit Logging, Security Hardening & RBAC Tests', () => {
         confirm_password: 'Password123!',
       });
     residentUserId = resRes.body.data.user.id;
-    residentToken = resRes.body.data.token;
+    await query("UPDATE users SET email_verified = true, account_status = 'ACTIVE' WHERE id = $1", [residentUserId]);
+    const resLogin = await request(app).post('/api/auth/login').send({
+      email: 'resident@mod8test.com',
+      password: 'Password123!',
+    });
+    residentToken = resLogin.body.data.token;
   });
 
   afterAll(async () => {

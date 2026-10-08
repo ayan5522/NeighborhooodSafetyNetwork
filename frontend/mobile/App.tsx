@@ -11,6 +11,7 @@ import { NeighborhoodMapScreen } from './src/screens/NeighborhoodMapScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
 import { OTPVerificationScreen } from './src/screens/OTPVerificationScreen';
 import { ResetPasswordScreen } from './src/screens/ResetPasswordScreen';
+import { EmailVerificationScreen } from './src/screens/EmailVerificationScreen';
 import { ReportIncidentScreen } from './src/screens/ReportIncidentScreen';
 import { MyReportsScreen } from './src/screens/MyReportsScreen';
 import { IncidentDetailsScreen } from './src/screens/IncidentDetailsScreen';
@@ -25,7 +26,7 @@ import { ModerationQueueScreen } from './src/screens/ModerationQueueScreen';
 import { ModerationDetailScreen } from './src/screens/ModerationDetailScreen';
 import { AuditLogsScreen } from './src/screens/AuditLogsScreen';
 
-type AuthNavScreen = 'login' | 'register' | 'forgot' | 'otp' | 'reset';
+type AuthNavScreen = 'login' | 'register' | 'verify_email' | 'forgot' | 'otp' | 'reset';
 type MainNavScreen =
   | 'home'
   | 'profile'
@@ -47,13 +48,13 @@ type MainNavScreen =
 const NavigationContainer: React.FC = () => {
   const { authenticated, loading } = useAuth();
   const [authScreen, setAuthScreen] = useState<AuthNavScreen>('login');
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState<string>('');
   const [mainScreen, setMainScreen] = useState<MainNavScreen>('home');
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [resetFlowState, setResetFlowState] = useState<{
     email: string;
-    devOtp?: string;
     resetToken?: string;
   }>({ email: '' });
 
@@ -226,14 +227,31 @@ const NavigationContainer: React.FC = () => {
   // Unauthenticated Navigation
   switch (authScreen) {
     case 'register':
-      return <RegisterScreen onNavigateLogin={() => setAuthScreen('login')} />;
+      return (
+        <RegisterScreen
+          onNavigateLogin={() => setAuthScreen('login')}
+          onNavigateVerifyEmail={(email) => {
+            setPendingVerificationEmail(email);
+            setAuthScreen('verify_email');
+          }}
+        />
+      );
+
+    case 'verify_email':
+      return (
+        <EmailVerificationScreen
+          email={pendingVerificationEmail}
+          onBack={() => setAuthScreen('login')}
+          onEditEmail={() => setAuthScreen('register')}
+        />
+      );
 
     case 'forgot':
       return (
         <ForgotPasswordScreen
           onNavigateLogin={() => setAuthScreen('login')}
-          onNavigateOtp={(email, devOtp) => {
-            setResetFlowState({ email, devOtp });
+          onNavigateOtp={(email) => {
+            setResetFlowState({ email });
             setAuthScreen('otp');
           }}
         />
@@ -243,7 +261,6 @@ const NavigationContainer: React.FC = () => {
       return (
         <OTPVerificationScreen
           email={resetFlowState.email}
-          devOtp={resetFlowState.devOtp}
           onBack={() => setAuthScreen('forgot')}
           onNavigateResetPassword={(resetToken) => {
             setResetFlowState((prev) => ({ ...prev, resetToken }));
@@ -269,6 +286,10 @@ const NavigationContainer: React.FC = () => {
         <LoginScreen
           onNavigateRegister={() => setAuthScreen('register')}
           onNavigateForgotPassword={() => setAuthScreen('forgot')}
+          onNavigateVerifyEmail={(email) => {
+            setPendingVerificationEmail(email);
+            setAuthScreen('verify_email');
+          }}
         />
       );
   }

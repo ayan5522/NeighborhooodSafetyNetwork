@@ -79,17 +79,36 @@ export const registerUser = async (data: {
   email: string;
   password: string;
   confirm_password: string;
-}): Promise<AuthResponse> => {
-  return request<AuthResponse['data']>('/auth/register', {
+}): Promise<ApiResponse<{ message: string; email: string }>> => {
+  return request<{ message: string; email: string }>('/auth/register', {
     method: 'POST',
     body: JSON.stringify(data),
+  });
+};
+
+export const verifyEmailOtp = async (data: {
+  email: string;
+  otp: string;
+}): Promise<AuthResponse> => {
+  return request<AuthResponse['data']>('/auth/verify-email-otp', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const resendVerificationOtp = async (
+  email: string
+): Promise<ApiResponse<{ message: string; cooldown_seconds?: number }>> => {
+  return request<{ message: string; cooldown_seconds?: number }>('/auth/resend-verification-otp', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
   });
 };
 
 export const loginUser = async (data: {
   email: string;
   password: string;
-}): Promise<AuthResponse> => {
+}): Promise<AuthResponse & { data?: AuthResponse['data'] & { email_verified?: boolean; email?: string } }> => {
   return request<AuthResponse['data']>('/auth/login', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -119,8 +138,8 @@ export const updateProfile = async (
 
 export const forgotPassword = async (
   email: string
-): Promise<ApiResponse<{ message: string; dev_otp?: string }>> => {
-  return request<{ message: string; dev_otp?: string }>('/auth/forgot-password', {
+): Promise<ApiResponse<{ message: string }>> => {
+  return request<{ message: string }>('/auth/forgot-password', {
     method: 'POST',
     body: JSON.stringify({ email }),
   });
@@ -139,11 +158,11 @@ export const verifyOtp = async (
 export const resetPassword = async (
   reset_token: string,
   new_password: string,
-  confirm_new_password: string
+  confirm_password: string
 ): Promise<ApiResponse<{ message: string }>> => {
   return request<{ message: string }>('/auth/reset-password', {
     method: 'POST',
-    body: JSON.stringify({ reset_token, new_password, confirm_new_password }),
+    body: JSON.stringify({ reset_token, new_password, confirm_password }),
   });
 };
 

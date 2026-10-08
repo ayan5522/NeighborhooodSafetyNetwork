@@ -42,3 +42,22 @@ logs/
 backend/uploads/*
 !backend/uploads/.gitkeep
 
+# Database installers
+installers/*.exe
+
+# Environment files
+.env
+.env.*
+
+# Dependencies
+node_modules/
+backend/node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# Build files
+build/
+

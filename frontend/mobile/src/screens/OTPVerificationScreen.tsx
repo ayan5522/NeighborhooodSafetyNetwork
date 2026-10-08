@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,44 +8,75 @@ import {
   Platform,
   TouchableOpacity,
 } from 'react-native';
-import { verifyOtp } from '../api/client';
+import { verifyOtp, forgotPassword } from '../api/client';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 
 interface OTPVerificationScreenProps {
   email: string;
-  devOtp?: string;
   onNavigateResetPassword: (resetToken: string) => void;
   onBack: () => void;
 }
 
 export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
   email,
-  devOtp,
   onNavigateResetPassword,
   onBack,
 }) => {
-  const [otp, setOtp] = useState<string>(devOtp || '');
+  const [otp, setOtp] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+  const [resending, setResending] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [cooldown, setCooldown] = useState<number>(60);
+
+  // Resend cooldown timer
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const interval = setInterval(() => {
+      setCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [cooldown]);
 
   const handleVerify = async () => {
     setErrorMessage(null);
+    setSuccessMessage(null);
 
-    if (!otp.trim() || otp.trim().length < 6) {
+    const cleanOtp = otp.trim();
+    if (!cleanOtp || cleanOtp.length !== 6 || !/^\d{6}$/.test(cleanOtp)) {
       setErrorMessage('Please enter the 6-digit OTP code.');
       return;
     }
 
     setLoading(true);
-    const res = await verifyOtp(email, otp.trim());
+    const res = await verifyOtp(email, cleanOtp);
     setLoading(false);
 
     if (res.success && res.data?.reset_token) {
       onNavigateResetPassword(res.data.reset_token);
     } else {
       setErrorMessage(res.message || 'Invalid or expired OTP code.');
+    }
+  };
+
+  const handleResend = async () => {
+    if (cooldown > 0 || resending) return;
+
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setResending(true);
+
+    const res = await forgotPassword(email);
+    setResending(false);
+
+    if (res.success) {
+      setSuccessMessage('A new recovery code has been sent to your email.');
+      setCooldown(60);
+      setOtp('');
+    } else {
+      setErrorMessage(res.message || 'Failed to resend code.');
     }
   };
 
@@ -56,6 +87,7 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
     >
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.header}>
+          <Text style={styles.badge}>Password Recovery</Text>
           <Text style={styles.title}>Enter OTP Code</Text>
           <Text style={styles.subTitle}>
             We sent a 6-digit verification code to:
@@ -70,11 +102,9 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
             </View>
           )}
 
-          {devOtp && (
-            <View style={styles.devBanner}>
-              <Text style={styles.devBannerText}>
-                [Dev Mode] Verification OTP: <Text style={styles.bold}>{devOtp}</Text>
-              </Text>
+          {successMessage && (
+            <View style={styles.successBanner}>
+              <Text style={styles.successBannerText}>{successMessage}</Text>
             </View>
           )}
 
@@ -85,6 +115,7 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
             onChangeText={setOtp}
             keyboardType="number-pad"
             maxLength={6}
+            autoFocus={true}
           />
 
           <Button
@@ -93,6 +124,23 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
             loading={loading}
             variant="primary"
           />
+
+          <View style={styles.resendSection}>
+            <Text style={styles.resendPrompt}>Didn't receive the code?</Text>
+            <TouchableOpacity
+              onPress={handleResend}
+              disabled={cooldown > 0 || resending}
+              style={[styles.resendButton, cooldown > 0 && styles.resendButtonDisabled]}
+            >
+              <Text style={[styles.resendButtonText, cooldown > 0 && styles.resendButtonTextDisabled]}>
+                {resending
+                  ? 'Sending...'
+                  : cooldown > 0
+                  ? `Resend Code (${cooldown}s)`
+                  : 'Resend OTP'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </Card>
 
         <View style={styles.footer}>
@@ -118,6 +166,17 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: 24,
+  },
+  badge: {
+    backgroundColor: '#fef3c7',
+    color: '#92400e',
+    fontSize: 12,
+    fontWeight: '700',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 8,
+    textTransform: 'uppercase',
   },
   title: {
     fontSize: 24,
@@ -150,21 +209,43 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '500',
   },
-  devBanner: {
-    backgroundColor: '#fef3c7',
+  successBanner: {
+    backgroundColor: '#dcfce7',
     borderWidth: 1,
-    borderColor: '#fcd34d',
+    borderColor: '#86efac',
     borderRadius: 8,
-    padding: 10,
+    padding: 12,
     marginBottom: 16,
   },
-  devBannerText: {
-    color: '#92400e',
-    fontSize: 13,
+  successBannerText: {
+    color: '#15803d',
+    fontSize: 14,
     textAlign: 'center',
+    fontWeight: '500',
   },
-  bold: {
-    fontWeight: 'bold',
+  resendSection: {
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  resendPrompt: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginBottom: 6,
+  },
+  resendButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  resendButtonDisabled: {
+    opacity: 0.6,
+  },
+  resendButtonText: {
+    color: '#2563eb',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  resendButtonTextDisabled: {
+    color: '#9ca3af',
   },
   footer: {
     alignItems: 'center',

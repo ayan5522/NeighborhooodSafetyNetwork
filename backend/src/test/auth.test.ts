@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { createApp } from '../app';
 import { pool, closePool, query } from '../db';
 import { config } from '../config';
+import { hashOtp } from '../utils/crypto';
 
 describe('Module 01: User & Authentication Management Tests', () => {
   const app = createApp();
@@ -21,13 +22,17 @@ describe('Module 01: User & Authentication Management Tests', () => {
 
   beforeAll(async () => {
     // Clean test data
-    await query('DELETE FROM password_resets WHERE email LIKE \'%@neighborhood.org\'');
-    await query('DELETE FROM users WHERE email LIKE \'%@neighborhood.org\'');
+    await query("DELETE FROM password_reset_tokens WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@neighborhood.org')");
+    await query("DELETE FROM email_verification_otps WHERE email LIKE '%@neighborhood.org'");
+    await query("DELETE FROM password_resets WHERE email LIKE '%@neighborhood.org'");
+    await query("DELETE FROM users WHERE email LIKE '%@neighborhood.org'");
   });
 
   afterAll(async () => {
-    await query('DELETE FROM password_resets WHERE email LIKE \'%@neighborhood.org\'');
-    await query('DELETE FROM users WHERE email LIKE \'%@neighborhood.org\'');
+    await query("DELETE FROM password_reset_tokens WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@neighborhood.org')");
+    await query("DELETE FROM email_verification_otps WHERE email LIKE '%@neighborhood.org'");
+    await query("DELETE FROM password_resets WHERE email LIKE '%@neighborhood.org'");
+    await query("DELETE FROM users WHERE email LIKE '%@neighborhood.org'");
     await closePool();
   });
 
@@ -41,12 +46,17 @@ describe('Module 01: User & Authentication Management Tests', () => {
     expect(res.body.success).toBe(true);
     expect(res.body.data.user.email).toBe(testUser.email.toLowerCase());
     expect(res.body.data.user.role).toBe('RESIDENT');
-    expect(res.body.data.user.account_status).toBe('ACTIVE');
+    expect(res.body.data.user.account_status).toBe('PENDING');
     expect(res.body.data.user.password_hash).toBeUndefined();
-    expect(res.body.data.token).toBeDefined();
 
-    authToken = res.body.data.token;
     userId = res.body.data.user.id;
+    // Activate user and login to get auth token
+    await query("UPDATE users SET email_verified = true, account_status = 'ACTIVE' WHERE id = $1", [userId]);
+    const loginRes = await request(app).post('/api/auth/login').send({
+      email: testUser.email,
+      password: testUser.password,
+    });
+    authToken = loginRes.body.data.token;
   });
 
   // 2. Register duplicate email
@@ -325,9 +335,20 @@ describe('Module 01: User & Authentication Management Tests', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(res.body.data.dev_otp).toBeDefined();
+    expect(res.body.data.dev_otp).toBeUndefined();
 
-    resetOtp = res.body.data.dev_otp;
+    const otpRes = await query(
+      "SELECT otp_hash FROM email_verification_otps WHERE email = $1 AND purpose = 'PASSWORD_RESET' ORDER BY created_at DESC LIMIT 1",
+      [testUser.email.toLowerCase()]
+    );
+    expect(otpRes.rows.length).toBe(1);
+    for (let i = 100000; i <= 999999; i++) {
+      if (hashOtp(String(i)) === otpRes.rows[0].otp_hash) {
+        resetOtp = String(i);
+        break;
+      }
+    }
+    expect(resetOtp).toBeDefined();
   });
 
   // 23. Forgot password nonexistent account
@@ -359,6 +380,10 @@ describe('Module 01: User & Authentication Management Tests', () => {
   it('25. OTP expired', async () => {
     // Set expiry in past
     await query(
+      "UPDATE email_verification_otps SET expires_at = NOW() - INTERVAL '1 hour' WHERE email = $1 AND purpose = 'PASSWORD_RESET'",
+      [testUser.email.toLowerCase()]
+    );
+    await query(
       "UPDATE password_resets SET otp_expires_at = NOW() - INTERVAL '1 hour' WHERE email = $1",
       [testUser.email.toLowerCase()]
     );
@@ -371,13 +396,17 @@ describe('Module 01: User & Authentication Management Tests', () => {
       });
 
     expect(res.status).toBe(400);
-    expect(res.body.message).toBe('OTP has expired');
+    expect(res.body.message).toContain('expired');
 
-    // Re-generate fresh OTP for remaining tests
-    const freshRes = await request(app)
-      .post('/api/auth/forgot-password')
-      .send({ email: testUser.email });
-    resetOtp = freshRes.body.data.dev_otp;
+    // Reset expiry for remaining tests
+    await query(
+      "UPDATE email_verification_otps SET expires_at = NOW() + INTERVAL '10 minutes', used_at = NULL WHERE email = $1 AND purpose = 'PASSWORD_RESET'",
+      [testUser.email.toLowerCase()]
+    );
+    await query(
+      "UPDATE password_resets SET otp_expires_at = NOW() + INTERVAL '10 minutes', used = false WHERE email = $1",
+      [testUser.email.toLowerCase()]
+    );
   });
 
   // 26. OTP reuse (tested after valid OTP)
@@ -434,11 +463,15 @@ describe('Module 01: User & Authentication Management Tests', () => {
       });
 
     expect(res.status).toBe(400);
-    expect(res.body.message).toBe('Invalid reset token');
+    expect(res.body.message).toContain('Invalid or expired reset token');
   });
 
   // 30. Expired reset token
   it('30. Expired reset token', async () => {
+    await query(
+      "UPDATE password_reset_tokens SET expires_at = NOW() - INTERVAL '1 hour' WHERE user_id = $1",
+      [userId]
+    );
     await query(
       "UPDATE password_resets SET token_expires_at = NOW() - INTERVAL '1 hour' WHERE reset_token = $1",
       [resetToken]
@@ -453,11 +486,15 @@ describe('Module 01: User & Authentication Management Tests', () => {
       });
 
     expect(res.status).toBe(400);
-    expect(res.body.message).toBe('Reset token has expired');
+    expect(res.body.message).toContain('Invalid or expired reset token');
 
     // Restore token validity for subsequent tests
     await query(
-      "UPDATE password_resets SET token_expires_at = NOW() + INTERVAL '15 minutes' WHERE reset_token = $1",
+      "UPDATE password_reset_tokens SET expires_at = NOW() + INTERVAL '15 minutes', used_at = NULL WHERE user_id = $1",
+      [userId]
+    );
+    await query(
+      "UPDATE password_resets SET token_expires_at = NOW() + INTERVAL '15 minutes', used = false WHERE reset_token = $1",
       [resetToken]
     );
   });
@@ -488,7 +525,7 @@ describe('Module 01: User & Authentication Management Tests', () => {
       });
 
     expect(res.status).toBe(400);
-    expect(res.body.message).toBe('Reset token has already been used');
+    expect(res.body.message).toContain('Invalid or expired reset token');
   });
 
   // 33. Login with new password

@@ -15,7 +15,7 @@ import { Card } from '../components/Card';
 
 interface ForgotPasswordScreenProps {
   onNavigateLogin: () => void;
-  onNavigateOtp: (email: string, devOtp?: string) => void;
+  onNavigateOtp: (email: string) => void;
 }
 
 export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({
@@ -39,7 +39,7 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({
     setLoading(false);
 
     if (res.success) {
-      onNavigateOtp(email.trim(), res.data?.dev_otp);
+      onNavigateOtp(email.trim());
     } else {
       setErrorMessage(res.message || "User doesn't exist in the system.");
     }
