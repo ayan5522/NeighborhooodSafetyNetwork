@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { NotificationService } from '../services/notificationService';
+import { AlertService } from '../services/alertService';
 import { AuditService } from '../services/auditService';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -17,6 +18,12 @@ export const getNotifications = async (req: Request, res: Response): Promise<voi
   const limit = parseInt(req.query.limit as string, 10) || 20;
 
   try {
+    try {
+      await AlertService.syncAlertsForUser(req.user.id);
+    } catch (syncErr) {
+      console.warn('Non-blocking alert sync warning in getNotifications:', syncErr);
+    }
+
     const result = await NotificationService.getUserNotifications(req.user.id, page, limit);
     res.status(200).json({
       success: true,
@@ -45,6 +52,12 @@ export const getUnreadCount = async (req: Request, res: Response): Promise<void>
   }
 
   try {
+    try {
+      await AlertService.syncAlertsForUser(req.user.id);
+    } catch (syncErr) {
+      console.warn('Non-blocking alert sync warning in getUnreadCount:', syncErr);
+    }
+
     const count = await NotificationService.getUnreadCount(req.user.id);
     res.status(200).json({
       success: true,

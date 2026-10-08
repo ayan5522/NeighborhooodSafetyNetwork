@@ -16,12 +16,14 @@ import { Card } from '../components/Card';
 
 interface EmailVerificationScreenProps {
   email: string;
+  onSuccess?: () => void;
   onBack: () => void;
   onEditEmail?: () => void;
 }
 
 export const EmailVerificationScreen: React.FC<EmailVerificationScreenProps> = ({
   email,
+  onSuccess,
   onBack,
   onEditEmail,
 }) => {
@@ -58,6 +60,7 @@ export const EmailVerificationScreen: React.FC<EmailVerificationScreenProps> = (
 
     if (res.success && res.data?.token && res.data?.user) {
       setSuccessMessage('Email verified successfully! Logging you in...');
+      onSuccess?.();
       // Automatic login: store token and user session directly without asking for password again
       await setAuthSession(res.data.token, res.data.user);
     } else {

@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import { useLocation } from '../hooks/useLocation';
 import { fetchUnreadAlertCount } from '../api/client';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
@@ -42,6 +43,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const { user, logout } = useAuth();
   const { unreadCount: unreadNotifCount, isSocketConnected } = useNotifications();
   const [unreadAlertCount, setUnreadAlertCount] = useState<number>(0);
+  const { requestAndSyncLocation } = useLocation();
+
+  // Automatically sync user location on HomeScreen mount so active emergency alerts are synchronized
+  useEffect(() => {
+    requestAndSyncLocation();
+  }, [requestAndSyncLocation]);
 
   useEffect(() => {
     fetchUnreadAlertCount().then((res) => {
@@ -49,7 +56,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         setUnreadAlertCount(res.data.count);
       }
     });
-  }, []);
+  }, [unreadNotifCount]);
 
   return (
     <SafeAreaView style={styles.container}>

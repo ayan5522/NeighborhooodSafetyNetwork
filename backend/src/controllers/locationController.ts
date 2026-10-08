@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { LocationService } from '../services/locationService';
+import { AlertService } from '../services/alertService';
 import { AuditService } from '../services/auditService';
 
 export const updateLocation = async (req: Request, res: Response): Promise<void> => {
@@ -29,6 +30,13 @@ export const updateLocation = async (req: Request, res: Response): Promise<void>
       longitude,
       accuracy ?? null
     );
+
+    // Synchronize active emergency alerts for user now that their location is current
+    try {
+      await AlertService.syncAlertsForUser(req.user.id);
+    } catch (syncErr) {
+      console.warn('Non-blocking alert sync warning on location update:', syncErr);
+    }
 
     AuditService.log({
       actor_user_id: req.user.id,

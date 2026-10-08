@@ -13,6 +13,12 @@ export const getAlerts = async (req: Request, res: Response): Promise<void> => {
   }
 
   try {
+    try {
+      await AlertService.syncAlertsForUser(req.user.id);
+    } catch (syncErr) {
+      console.warn('Non-blocking alert sync warning in getAlerts:', syncErr);
+    }
+
     const alerts = await AlertService.getUserAlerts(req.user.id);
     res.status(200).json({
       success: true,
@@ -38,6 +44,12 @@ export const getUnreadAlertCount = async (req: Request, res: Response): Promise<
   }
 
   try {
+    try {
+      await AlertService.syncAlertsForUser(req.user.id);
+    } catch (syncErr) {
+      console.warn('Non-blocking alert sync warning in getUnreadAlertCount:', syncErr);
+    }
+
     const count = await AlertService.getUnreadCount(req.user.id);
     res.status(200).json({
       success: true,

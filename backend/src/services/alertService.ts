@@ -132,6 +132,109 @@ export class AlertService {
   }
 
   /**
+   * Synchronizes active, non-expired emergency alerts for a user based on their latest location.
+   * Evaluates all active incidents in PostgreSQL using PostGIS spatial queries.
+   * If eligible incidents exist that do not yet have an alert for this user:
+   * 1. Inserts the alert with status 'ACTIVE' (deduplicated by uq_alerts_incident_recipient).
+   * 2. Inserts a corresponding persistent notification in notifications table.
+   * 3. Emits 'notification:new' event via Socket.IO to user:<userId>.
+   *
+   * Guaranteed:
+   * - No duplicates (ON CONFLICT (incident_id, recipient_user_id) DO NOTHING)
+   * - Ignores expired, resolved, or cancelled incidents
+   * - Ignores users with stale location (> maxAgeMinutes) or suspended accounts
+   * - Reporter never receives alert for own incident
+   */
+  public static async syncAlertsForUser(userId: string): Promise<number> {
+    await this.normalizeExpiredAlerts();
+
+    const maxAgeMinutes = config.location.maxAgeMinutes;
+
+    const sql = `
+      INSERT INTO alerts (incident_id, recipient_user_id, priority, status, expires_at)
+      SELECT
+        i.id,
+        ul.user_id,
+        CASE i.severity
+          WHEN 'CRITICAL' THEN 'URGENT'::varchar(20)
+          WHEN 'HIGH' THEN 'HIGH'::varchar(20)
+          WHEN 'LOW' THEN 'LOW'::varchar(20)
+          ELSE 'NORMAL'::varchar(20)
+        END,
+        'ACTIVE',
+        i.created_at + (
+          CASE i.severity
+            WHEN 'CRITICAL' THEN INTERVAL '1 hour'
+            WHEN 'HIGH' THEN INTERVAL '3 hours'
+            ELSE INTERVAL '6 hours'
+          END
+        )
+      FROM user_locations ul
+      JOIN users u ON ul.user_id = u.id
+      CROSS JOIN incidents i
+      WHERE ul.user_id = $1
+        AND u.account_status = 'ACTIVE'
+        AND ul.updated_at >= NOW() - ($2 || ' minutes')::interval
+        AND i.reporter_id != ul.user_id
+        AND i.status IN ('PENDING', 'ACTIVE')
+        AND (
+          i.created_at + (
+            CASE i.severity
+              WHEN 'CRITICAL' THEN INTERVAL '1 hour'
+              WHEN 'HIGH' THEN INTERVAL '3 hours'
+              ELSE INTERVAL '6 hours'
+            END
+          ) > NOW()
+        )
+        AND ST_DWithin(
+          ul.location,
+          i.location,
+          CASE i.severity
+            WHEN 'CRITICAL' THEN 5000
+            WHEN 'HIGH' THEN 3000
+            WHEN 'LOW' THEN 1000
+            ELSE 2000
+          END
+        )
+      ON CONFLICT (incident_id, recipient_user_id) DO NOTHING
+      RETURNING id, incident_id, recipient_user_id;
+    `;
+
+    const res = await query(sql, [userId, maxAgeMinutes]);
+
+    if (res.rows.length === 0) {
+      return 0;
+    }
+
+    const incidentIds = res.rows.map((r: any) => r.incident_id);
+    const incRes = await query(
+      `SELECT id, title, category, severity FROM incidents WHERE id = ANY($1)`,
+      [incidentIds]
+    );
+    const incMap = new Map(incRes.rows.map((inc: any) => [inc.id, inc]));
+
+    for (const alert of res.rows) {
+      const inc = incMap.get(alert.incident_id);
+      if (inc) {
+        try {
+          await NotificationService.createNotification({
+            user_id: alert.recipient_user_id,
+            type: 'ALERT_CREATED',
+            title: 'Safety alert nearby',
+            message: `A ${inc.severity} severity ${inc.category.toLowerCase().replace(/_/g, ' ')} was reported near you.`,
+            incident_id: inc.id,
+            alert_id: alert.id,
+          });
+        } catch (notifErr) {
+          console.warn('Non-blocking notification generation warning in syncAlertsForUser:', notifErr);
+        }
+      }
+    }
+
+    return res.rows.length;
+  }
+
+  /**
    * Retrieve alerts targeted to the authenticated recipient.
    * Returns privacy-safe incident information without revealing reporter's private details.
    */

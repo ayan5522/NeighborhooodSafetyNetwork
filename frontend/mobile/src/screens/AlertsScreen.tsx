@@ -10,6 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { fetchUserAlerts } from '../api/client';
+import { useNotifications } from '../context/NotificationContext';
 import { Button } from '../components/Button';
 import {
   Alert,
@@ -27,6 +28,7 @@ export const AlertsScreen: React.FC<AlertsScreenProps> = ({
   onBack,
   onSelectAlert,
 }) => {
+  const { unreadCount: unreadNotifCount } = useNotifications();
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -51,7 +53,7 @@ export const AlertsScreen: React.FC<AlertsScreenProps> = ({
 
   useEffect(() => {
     loadAlerts();
-  }, [loadAlerts]);
+  }, [loadAlerts, unreadNotifCount]);
 
   const onRefresh = () => {
     setRefreshing(true);

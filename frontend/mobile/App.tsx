@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
@@ -57,6 +57,21 @@ const NavigationContainer: React.FC = () => {
     email: string;
     resetToken?: string;
   }>({ email: '' });
+
+  // Reset unauthenticated navigation stack to root LoginScreen whenever user logs out
+  const prevAuthenticated = useRef(authenticated);
+  useEffect(() => {
+    if (prevAuthenticated.current && !authenticated) {
+      setAuthScreen('login');
+      setPendingVerificationEmail('');
+      setMainScreen('home');
+      setSelectedIncidentId(null);
+      setSelectedAlertId(null);
+      setSelectedReportId(null);
+      setResetFlowState({ email: '' });
+    }
+    prevAuthenticated.current = authenticated;
+  }, [authenticated]);
 
   if (loading) {
     return (
@@ -241,7 +256,14 @@ const NavigationContainer: React.FC = () => {
       return (
         <EmailVerificationScreen
           email={pendingVerificationEmail}
-          onBack={() => setAuthScreen('login')}
+          onSuccess={() => {
+            setAuthScreen('login');
+            setPendingVerificationEmail('');
+          }}
+          onBack={() => {
+            setAuthScreen('login');
+            setPendingVerificationEmail('');
+          }}
           onEditEmail={() => setAuthScreen('register')}
         />
       );
