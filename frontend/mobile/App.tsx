@@ -53,6 +53,7 @@ const NavigationContainer: React.FC = () => {
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const [incidentBackScreen, setIncidentBackScreen] = useState<MainNavScreen>('home');
   const [resetFlowState, setResetFlowState] = useState<{
     email: string;
     resetToken?: string;
@@ -68,6 +69,7 @@ const NavigationContainer: React.FC = () => {
       setSelectedIncidentId(null);
       setSelectedAlertId(null);
       setSelectedReportId(null);
+      setIncidentBackScreen('home');
       setResetFlowState({ email: '' });
     }
     prevAuthenticated.current = authenticated;
@@ -92,6 +94,7 @@ const NavigationContainer: React.FC = () => {
           onNavigateReport={() => setMainScreen('report_incident')}
           onSelectIncident={(id) => {
             setSelectedIncidentId(id);
+            setIncidentBackScreen('map');
             setMainScreen('incident_details');
           }}
         />
@@ -103,6 +106,7 @@ const NavigationContainer: React.FC = () => {
           onBack={() => setMainScreen('home')}
           onSuccess={(id) => {
             setSelectedIncidentId(id);
+            setIncidentBackScreen('home');
             setMainScreen('incident_details');
           }}
         />
@@ -115,6 +119,7 @@ const NavigationContainer: React.FC = () => {
           onNavigateReport={() => setMainScreen('report_incident')}
           onSelectIncident={(id) => {
             setSelectedIncidentId(id);
+            setIncidentBackScreen('my_reports');
             setMainScreen('incident_details');
           }}
         />
@@ -124,7 +129,8 @@ const NavigationContainer: React.FC = () => {
       return (
         <IncidentDetailsScreen
           incidentId={selectedIncidentId}
-          onBack={() => setMainScreen('home')}
+          onBack={() => setMainScreen(incidentBackScreen)}
+          onIncidentCancelled={() => setMainScreen(incidentBackScreen)}
         />
       );
     }
@@ -136,6 +142,11 @@ const NavigationContainer: React.FC = () => {
             setSelectedAlertId(id);
             setMainScreen('alert_details');
           }}
+          onSelectIncident={(id) => {
+            setSelectedIncidentId(id);
+            setIncidentBackScreen('alerts');
+            setMainScreen('incident_details');
+          }}
         />
       );
     }
@@ -145,6 +156,11 @@ const NavigationContainer: React.FC = () => {
           alertId={selectedAlertId}
           onBack={() => setMainScreen('alerts')}
           onNavigateMap={() => setMainScreen('map')}
+          onNavigateIncident={(id) => {
+            setSelectedIncidentId(id);
+            setIncidentBackScreen('alert_details');
+            setMainScreen('incident_details');
+          }}
         />
       );
     }
@@ -173,6 +189,7 @@ const NavigationContainer: React.FC = () => {
           }}
           onSelectIncident={(id) => {
             setSelectedIncidentId(id);
+            setIncidentBackScreen('notifications');
             setMainScreen('incident_details');
           }}
         />

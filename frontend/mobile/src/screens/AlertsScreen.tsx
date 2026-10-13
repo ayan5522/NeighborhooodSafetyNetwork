@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { fetchUserAlerts } from '../api/client';
+import { fetchUserAlerts, markAlertAsRead } from '../api/client';
 import { useNotifications } from '../context/NotificationContext';
 import { Button } from '../components/Button';
 import {
@@ -21,12 +21,14 @@ import { CATEGORY_LABELS } from '../types/incident';
 
 interface AlertsScreenProps {
   onBack: () => void;
-  onSelectAlert: (alertId: string) => void;
+  onSelectAlert?: (alertId: string) => void;
+  onSelectIncident: (incidentId: string) => void;
 }
 
 export const AlertsScreen: React.FC<AlertsScreenProps> = ({
   onBack,
   onSelectAlert,
+  onSelectIncident,
 }) => {
   const { unreadCount: unreadNotifCount } = useNotifications();
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -60,6 +62,20 @@ export const AlertsScreen: React.FC<AlertsScreenProps> = ({
     loadAlerts();
   };
 
+  const handleSelectAlert = (item: Alert) => {
+    if (!item.read_at) {
+      markAlertAsRead(item.id).catch((err) =>
+        console.warn('Failed to mark alert as read:', err)
+      );
+      setAlerts((prev) =>
+        prev.map((a) =>
+          a.id === item.id ? { ...a, read_at: new Date().toISOString() } : a
+        )
+      );
+    }
+    onSelectIncident(item.incident_id);
+  };
+
   const renderAlertItem = ({ item }: { item: Alert }) => {
     const priorityColor = PRIORITY_COLORS[item.priority] || '#3b82f6';
     const statusColor = ALERT_STATUS_COLORS[item.status] || '#6b7280';
@@ -70,7 +86,7 @@ export const AlertsScreen: React.FC<AlertsScreenProps> = ({
       <TouchableOpacity
         style={[styles.card, isUnread && styles.unreadCard]}
         activeOpacity={0.7}
-        onPress={() => onSelectAlert(item.id)}
+        onPress={() => handleSelectAlert(item)}
       >
         <View style={styles.cardTop}>
           <View style={styles.badgeRow}>
@@ -125,7 +141,7 @@ export const AlertsScreen: React.FC<AlertsScreenProps> = ({
           {isUnread && !isExpired ? (
             <Text style={styles.newAlertTag}>NEW</Text>
           ) : (
-            <Text style={styles.readTag}>Tap for details →</Text>
+            <Text style={styles.readTag}>View Incident Details →</Text>
           )}
         </View>
       </TouchableOpacity>

@@ -22,12 +22,14 @@ interface AlertDetailsScreenProps {
   alertId: string;
   onBack: () => void;
   onNavigateMap?: (lat: number, lng: number) => void;
+  onNavigateIncident?: (incidentId: string) => void;
 }
 
 export const AlertDetailsScreen: React.FC<AlertDetailsScreenProps> = ({
   alertId,
   onBack,
   onNavigateMap,
+  onNavigateIncident,
 }) => {
   const [alert, setAlert] = useState<Alert | null>(null);
   const [loading, setLoading] = useState(true);
@@ -163,12 +165,20 @@ export const AlertDetailsScreen: React.FC<AlertDetailsScreenProps> = ({
               <Text style={styles.infoLabel}>Incident Status:</Text>
               <Text style={styles.infoValue}>{inc.status}</Text>
             </View>
+            {onNavigateIncident && (
+              <Button
+                title="📄 View Incident Details"
+                onPress={() => onNavigateIncident(alert.incident_id)}
+                variant="primary"
+                style={{ marginTop: 12 }}
+              />
+            )}
             {onNavigateMap && (
               <Button
                 title="🗺️ View on Neighborhood Map"
                 onPress={() => onNavigateMap(inc.latitude, inc.longitude)}
                 variant="outline"
-                style={{ marginTop: 12 }}
+                style={{ marginTop: 8 }}
               />
             )}
           </Card>
