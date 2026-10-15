@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { SOSService } from '../services/sosService';
+import { AuditService } from '../services/auditService';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -26,6 +27,17 @@ export const createSOS = async (req: Request, res: Response): Promise<void> => {
 
   try {
     const result = await SOSService.createSOS(req.user.id, lat, lng);
+
+    AuditService.log({
+      actor_user_id: req.user.id,
+      action: 'SOS_CREATED',
+      entity_type: 'sos_event',
+      entity_id: result.sos.id,
+      description: `User triggered emergency SOS event (${result.isExisting ? 'existing' : 'new'})`,
+      metadata: { latitude: lat, longitude: lng, is_existing: result.isExisting },
+      req,
+    });
+
     res.status(201).json({
       success: true,
       data: {
@@ -101,6 +113,16 @@ export const resolveSOS = async (req: Request, res: Response): Promise<void> => 
       });
       return;
     }
+
+    AuditService.log({
+      actor_user_id: req.user.id,
+      action: 'SOS_RESOLVED',
+      entity_type: 'sos_event',
+      entity_id: id,
+      description: `User resolved emergency SOS event`,
+      metadata: { sos_id: id },
+      req,
+    });
 
     res.status(200).json({
       success: true,

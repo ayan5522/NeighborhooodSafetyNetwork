@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -36,6 +36,44 @@ export const EmergencyScreen: React.FC<EmergencyScreenProps> = ({
   const [primaryContact, setPrimaryContact] = useState<EmergencyContact | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const actionLoadingRef = useRef(false);
+
+  const showAlert = (title: string, message: string) => {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.alert) {
+        window.alert(`${title}\n\n${message}`);
+      }
+    } else {
+      Alert.alert(title, message);
+    }
+  };
+
+  const confirmAction = (
+    title: string,
+    message: string,
+    confirmText: string,
+    onConfirm: () => void
+  ) => {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm) {
+        const confirmed = window.confirm(`${title}\n\n${message}`);
+        if (confirmed) {
+          onConfirm();
+        }
+      } else {
+        onConfirm();
+      }
+    } else {
+      Alert.alert(title, message, [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: confirmText,
+          style: 'destructive',
+          onPress: onConfirm,
+        },
+      ]);
+    }
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -65,56 +103,73 @@ export const EmergencyScreen: React.FC<EmergencyScreenProps> = ({
    * Confirmation before triggering SOS (Requirement 36)
    */
   const handleTriggerSOS = () => {
-    Alert.alert(
+    confirmAction(
       '⚠️ Confirm Emergency SOS',
       'Are you sure you want to trigger personal emergency assistance? Your GPS coordinates will be captured.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm SOS',
-          style: 'destructive',
-          onPress: executeSOS,
-        },
-      ]
+      'Confirm SOS',
+      executeSOS
     );
   };
 
   const executeSOS = async () => {
+    if (actionLoadingRef.current || actionLoading) return;
+    actionLoadingRef.current = true;
     setActionLoading(true);
+
     try {
       let currentLat = location?.latitude;
       let currentLng = location?.longitude;
 
-      if (!currentLat || !currentLng) {
-        // Try one immediate sync
-        await requestAndSyncLocation();
-        currentLat = location?.latitude;
-        currentLng = location?.longitude;
+      if (currentLat === undefined || currentLng === undefined) {
+        // Synchronously acquire location if not yet ready
+        const locResult = await requestAndSyncLocation();
+        if (locResult.success && locResult.location) {
+          currentLat = locResult.location.latitude;
+          currentLng = locResult.location.longitude;
+        } else if (locResult.permissionDenied) {
+          showAlert(
+            'Location Permission Required',
+            'Location permission is required to broadcast your SOS coordinates. Please enable location permissions in settings.'
+          );
+          return;
+        } else if (locResult.servicesDisabled) {
+          showAlert(
+            'Location Services Disabled',
+            'Please turn on GPS / Location Services on your device to trigger SOS.'
+          );
+          return;
+        } else {
+          showAlert(
+            'Location Error',
+            locResult.error || 'Could not acquire GPS coordinates. Please ensure GPS is enabled.'
+          );
+          return;
+        }
       }
 
-      if (!currentLat || !currentLng) {
-        Alert.alert(
+      if (currentLat === undefined || currentLng === undefined) {
+        showAlert(
           'Location Required',
           'Could not acquire device GPS location. Please ensure location services are enabled.'
         );
-        setActionLoading(false);
         return;
       }
 
       const res = await createSOS(currentLat, currentLng);
-      if (res.success && res.data) {
+      if (res.success && res.data?.sos) {
         setActiveSOS(res.data.sos);
-        Alert.alert(
+        showAlert(
           'Emergency SOS Active',
           'Your personal SOS event has been logged. Use the actions below to call emergency services or notify your contact.'
         );
       } else {
-        Alert.alert('SOS Error', res.message || 'Failed to trigger SOS');
+        showAlert('SOS Error', res.message || 'Failed to trigger SOS');
       }
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to trigger SOS');
+      showAlert('Error', err.message || 'Failed to trigger SOS');
     } finally {
       setActionLoading(false);
+      actionLoadingRef.current = false;
     }
   };
 
@@ -164,9 +219,9 @@ export const EmergencyScreen: React.FC<EmergencyScreenProps> = ({
     }
 
     const coordsStr = activeSOS
-      ? `${activeSOS.latitude.toFixed(5)}, ${activeSOS.longitude.toFixed(5)}`
+      ? `${Number(activeSOS.latitude).toFixed(5)}, ${Number(activeSOS.longitude).toFixed(5)}`
       : location
-      ? `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}`
+      ? `${Number(location.latitude).toFixed(5)}, ${Number(location.longitude).toFixed(5)}`
       : 'Location captured';
 
     const message = encodeURIComponent(
@@ -188,29 +243,36 @@ export const EmergencyScreen: React.FC<EmergencyScreenProps> = ({
       });
   };
 
+  const executeResolve = async () => {
+    if (!activeSOS) return;
+    if (actionLoadingRef.current || actionLoading) return;
+    actionLoadingRef.current = true;
+    setActionLoading(true);
+
+    try {
+      const res = await resolveSOS(activeSOS.id);
+      if (res.success && res.data?.sos) {
+        setActiveSOS(null);
+        showAlert('Resolved', 'Your emergency SOS has been marked as resolved.');
+      } else {
+        showAlert('Resolution Error', res.message || 'Could not resolve emergency SOS.');
+      }
+    } catch (err: any) {
+      showAlert('Error', err.message || 'An unexpected error occurred while resolving SOS.');
+    } finally {
+      setActionLoading(false);
+      actionLoadingRef.current = false;
+    }
+  };
+
   const handleResolveSOS = () => {
     if (!activeSOS) return;
 
-    Alert.alert(
+    confirmAction(
       'Resolve Emergency',
       'Are you safe now? This will mark your active SOS event as RESOLVED.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'I Am Safe Now',
-          onPress: async () => {
-            setActionLoading(true);
-            try {
-              const res = await resolveSOS(activeSOS.id);
-              if (res.success) {
-                setActiveSOS(null);
-                Alert.alert('Resolved', 'Your emergency SOS has been resolved.');
-              }
-            } catch {}
-            setActionLoading(false);
-          },
-        },
-      ]
+      'I Am Safe Now',
+      executeResolve
     );
   };
 
@@ -234,7 +296,7 @@ export const EmergencyScreen: React.FC<EmergencyScreenProps> = ({
               <Text style={styles.activeBannerTitle}>ACTIVE PERSONAL SOS</Text>
               <Text style={styles.activeBannerSubtitle}>
                 Triggered at {new Date(activeSOS.created_at).toLocaleTimeString()} • Lat:{' '}
-                {activeSOS.latitude.toFixed(4)}, Lng: {activeSOS.longitude.toFixed(4)}
+                {Number(activeSOS.latitude).toFixed(4)}, Lng: {Number(activeSOS.longitude).toFixed(4)}
               </Text>
             </View>
           </View>
@@ -257,19 +319,26 @@ export const EmergencyScreen: React.FC<EmergencyScreenProps> = ({
                 onPress={handleResolveSOS}
                 variant="primary"
                 loading={actionLoading}
+                disabled={actionLoading}
                 style={{ marginTop: 8 }}
               />
             </View>
           ) : (
             <TouchableOpacity
-              style={styles.sosButton}
+              style={[styles.sosButton, actionLoading && styles.sosButtonDisabled]}
               activeOpacity={0.8}
               onPress={handleTriggerSOS}
-              disabled={actionLoading || locationLoading}
+              disabled={actionLoading}
             >
               <View style={styles.sosInnerCircle}>
-                <Text style={styles.sosText}>SOS</Text>
-                <Text style={styles.sosSubtext}>TAP TO ACTIVATE</Text>
+                {actionLoading ? (
+                  <ActivityIndicator size="large" color="#ffffff" />
+                ) : (
+                  <>
+                    <Text style={styles.sosText}>SOS</Text>
+                    <Text style={styles.sosSubtext}>TAP TO ACTIVATE</Text>
+                  </>
+                )}
               </View>
             </TouchableOpacity>
           )}
@@ -419,6 +488,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 6,
+  },
+  sosButtonDisabled: {
+    opacity: 0.6,
   },
   sosInnerCircle: {
     width: 140,

@@ -21,8 +21,8 @@ describe('Module 03: Incident Reporting Tests', () => {
 
     // User A
     const userARes = await query(
-      `INSERT INTO users (full_name, email, password_hash, role, account_status)
-       VALUES ('Incident Reporter A', 'user.a@incidenttest.org', $1, 'RESIDENT', 'ACTIVE')
+      `INSERT INTO users (full_name, email, password_hash, role, account_status, email_verified)
+       VALUES ('Incident Reporter A', 'user.a@incidenttest.org', $1, 'RESIDENT', 'ACTIVE', true)
        RETURNING id`,
       [pwdHash]
     );
@@ -31,8 +31,8 @@ describe('Module 03: Incident Reporting Tests', () => {
 
     // User B
     const userBRes = await query(
-      `INSERT INTO users (full_name, email, password_hash, role, account_status)
-       VALUES ('Incident Reporter B', 'user.b@incidenttest.org', $1, 'RESIDENT', 'ACTIVE')
+      `INSERT INTO users (full_name, email, password_hash, role, account_status, email_verified)
+       VALUES ('Incident Reporter B', 'user.b@incidenttest.org', $1, 'RESIDENT', 'ACTIVE', true)
        RETURNING id`,
       [pwdHash]
     );

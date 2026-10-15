@@ -244,16 +244,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </Card>
         )}
 
-        <Card>
-          <Text style={styles.cardTitle}>Neighborhood Safety Network</Text>
-          <Text style={styles.networkStatus}>
-            🟢 Modules 1 to 8 Fully Operational
-          </Text>
-          <Text style={styles.networkSubtext}>
-            Auth, Location, Incidents, Alerts, Verification, Notifications, Admin & Moderation, Audit Logs & Security Hardening.
-          </Text>
-        </Card>
-
         <View style={styles.actionButtons}>
           <Button
             title="Edit Profile"
@@ -359,16 +349,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  networkStatus: {
-    fontSize: 14,
-    color: '#15803d',
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  networkSubtext: {
-    fontSize: 13,
-    color: '#6b7280',
-  },
   emergencyCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -400,7 +380,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   actionButtons: {
-    marginTop: 10,
+    marginTop: 4,
     gap: 8,
   },
 });

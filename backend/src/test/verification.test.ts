@@ -227,21 +227,28 @@ describe('Module 05: Community Verification Tests', () => {
     expect(res.body.data.my_verification).toBe('DISPUTE');
   });
 
-  // 11. Neighbor A switches from CONFIRM to DISPUTE -> counts update cleanly (0 confirm, 3 dispute)
-  it('11. Neighbor A changes vote from CONFIRM to DISPUTE without duplicate rows', async () => {
+  // 11. Enforce permanent votes: Neighbor A cannot change vote from CONFIRM to DISPUTE
+  it('11. Changing vote from CONFIRM to DISPUTE is rejected with 400', async () => {
     const res = await request(app)
       .post(`/api/incidents/${activeIncidentId}/verify`)
       .set('Authorization', `Bearer ${neighborAToken}`)
       .send({ verification_type: 'DISPUTE' });
 
-    expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
-    expect(res.body.data.confirm_count).toBe(0);
-    expect(res.body.data.dispute_count).toBe(3);
-    expect(res.body.data.status).toBe('COMMUNITY_DISPUTED');
-    expect(res.body.data.my_verification).toBe('DISPUTE');
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.message).toContain('Community verification votes are permanent and cannot be changed');
 
-    // Invariant: Verify DB has exactly 3 records, and Neighbor A has only 1 record
+    // Also verify Neighbor B cannot change from DISPUTE to CONFIRM
+    const resB = await request(app)
+      .post(`/api/incidents/${activeIncidentId}/verify`)
+      .set('Authorization', `Bearer ${neighborBToken}`)
+      .send({ verification_type: 'CONFIRM' });
+
+    expect(resB.status).toBe(400);
+    expect(resB.body.success).toBe(false);
+    expect(resB.body.message).toContain('Community verification votes are permanent and cannot be changed');
+
+    // Invariant: Verify DB still has exactly 3 records, Neighbor A is CONFIRM, Neighbor B is DISPUTE
     const dbCheck = await query(
       'SELECT COUNT(*)::int AS count FROM incident_verifications WHERE incident_id = $1',
       [activeIncidentId]
@@ -249,10 +256,18 @@ describe('Module 05: Community Verification Tests', () => {
     expect(dbCheck.rows[0].count).toBe(3);
 
     const neighborACheck = await query(
-      'SELECT COUNT(*)::int AS count FROM incident_verifications WHERE incident_id = $1 AND user_id = $2',
+      'SELECT verification_type FROM incident_verifications WHERE incident_id = $1 AND user_id = $2',
       [activeIncidentId, neighborAId]
     );
-    expect(neighborACheck.rows[0].count).toBe(1);
+    expect(neighborACheck.rows.length).toBe(1);
+    expect(neighborACheck.rows[0].verification_type).toBe('CONFIRM');
+
+    const neighborBCheck = await query(
+      'SELECT verification_type FROM incident_verifications WHERE incident_id = $1 AND user_id = $2',
+      [activeIncidentId, neighborBId]
+    );
+    expect(neighborBCheck.rows.length).toBe(1);
+    expect(neighborBCheck.rows[0].verification_type).toBe('DISPUTE');
   });
 
   // 12. Idempotent re-submission of same verification does not duplicate
@@ -260,12 +275,20 @@ describe('Module 05: Community Verification Tests', () => {
     const res = await request(app)
       .post(`/api/incidents/${activeIncidentId}/verify`)
       .set('Authorization', `Bearer ${neighborAToken}`)
-      .send({ verification_type: 'DISPUTE' });
+      .send({ verification_type: 'CONFIRM' });
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(res.body.data.confirm_count).toBe(0);
-    expect(res.body.data.dispute_count).toBe(3);
+    expect(res.body.data.confirm_count).toBe(1);
+    expect(res.body.data.dispute_count).toBe(2);
+    expect(res.body.data.my_verification).toBe('CONFIRM');
+
+    // Check no duplicate row was created
+    const dbCheck = await query(
+      'SELECT COUNT(*)::int AS count FROM incident_verifications WHERE incident_id = $1',
+      [activeIncidentId]
+    );
+    expect(dbCheck.rows[0].count).toBe(3);
   });
 
   // 13. Closed incidents cannot be verified (CANCELLED / RESOLVED)
@@ -308,10 +331,10 @@ describe('Module 05: Community Verification Tests', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.data.incident.verification).toBeDefined();
-    expect(res.body.data.incident.verification.confirm_count).toBe(0);
-    expect(res.body.data.incident.verification.dispute_count).toBe(3);
+    expect(res.body.data.incident.verification.confirm_count).toBe(1);
+    expect(res.body.data.incident.verification.dispute_count).toBe(2);
     expect(res.body.data.incident.verification.status).toBe('COMMUNITY_DISPUTED');
-    expect(res.body.data.incident.verification.my_verification).toBe('DISPUTE');
+    expect(res.body.data.incident.verification.my_verification).toBe('CONFIRM');
   });
 
   // 16. PRIVACY TEST: Verification summary exposes NO user IDs or names of other verifiers

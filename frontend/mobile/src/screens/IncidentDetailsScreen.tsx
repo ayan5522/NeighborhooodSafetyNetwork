@@ -11,6 +11,7 @@ import {
   Alert,
   TextInput,
   Modal,
+  Platform,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -208,36 +209,64 @@ export const IncidentDetailsScreen: React.FC<IncidentDetailsScreenProps> = ({
     }
   };
 
-  const handleCancelIncident = () => {
-    Alert.alert(
-      'Cancel Incident',
-      'Are you sure you want to cancel this incident report? This will mark it as CANCELLED across the neighborhood network.',
-      [
+  const confirmAction = (
+    title: string,
+    message: string,
+    onConfirm: () => void | Promise<void>
+  ) => {
+    if (Platform.OS === 'web') {
+      const ok =
+        typeof window !== 'undefined' && window.confirm
+          ? window.confirm(`${title}\n\n${message}`)
+          : true;
+      if (ok) {
+        onConfirm();
+      }
+    } else {
+      Alert.alert(title, message, [
         { text: 'No, Keep Active', style: 'cancel' },
-        {
-          text: 'Yes, Cancel Incident',
-          style: 'destructive',
-          onPress: async () => {
-            setActionLoading(true);
-            try {
-              const res = await cancelIncident(incidentId);
-              if (res.success && res.data) {
-                setIncident(res.data.incident);
-                Alert.alert('Cancelled', 'Your incident report has been cancelled.');
-                if (onIncidentCancelled) onIncidentCancelled();
-              } else {
-                Alert.alert('Cancel Failed', res.message || 'Failed to cancel incident.');
-              }
-            } catch (err: any) {
-              Alert.alert('Error', err.message || 'Failed to cancel incident.');
-            } finally {
-              setActionLoading(false);
-            }
-          },
-        },
-      ]
+        { text: 'Yes, Cancel Incident', style: 'destructive', onPress: onConfirm },
+      ]);
+    }
+  };
+
+  const showAlert = (title: string, message: string, onOk?: () => void) => {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.alert) {
+        window.alert(`${title}\n\n${message}`);
+      }
+      if (onOk) onOk();
+    } else {
+      Alert.alert(title, message, onOk ? [{ text: 'OK', onPress: onOk }] : undefined);
+    }
+  };
+
+  const handleCancelIncident = () => {
+    confirmAction(
+      'Cancel Incident',
+      'Are you sure you want to cancel this incident report? This will mark it as CANCELLED across the neighborhood network and resolve active alerts.',
+      async () => {
+        setActionLoading(true);
+        try {
+          const res = await cancelIncident(incidentId);
+          if (res.success && res.data) {
+            setIncident(res.data.incident);
+            showAlert('Cancelled', 'Your incident report has been cancelled.', () => {
+              if (onIncidentCancelled) onIncidentCancelled();
+            });
+          } else {
+            showAlert('Cancel Failed', res.message || 'Failed to cancel incident.');
+          }
+        } catch (err: any) {
+          showAlert('Error', err.message || 'Failed to cancel incident.');
+        } finally {
+          setActionLoading(false);
+        }
+      }
     );
   };
+
+  const hasVoted = Boolean(verification?.my_verification);
 
   const handleVerify = async (type: VerificationType) => {
     if (isOwner) {
@@ -246,6 +275,13 @@ export const IncidentDetailsScreen: React.FC<IncidentDetailsScreenProps> = ({
     }
     if (isCancelled || incident?.status === 'RESOLVED') {
       Alert.alert('Notice', 'Verification is closed for this incident.');
+      return;
+    }
+    if (hasVoted) {
+      Alert.alert(
+        'Vote Already Recorded',
+        'You have already voted on this incident. Community verification votes are permanent and cannot be changed.'
+      );
       return;
     }
 
@@ -534,48 +570,66 @@ export const IncidentDetailsScreen: React.FC<IncidentDetailsScreenProps> = ({
               </Text>
             </View>
           ) : (
-            <View style={styles.verificationBtnGroup}>
-              <TouchableOpacity
-                style={[
-                  styles.verifyBtn,
-                  styles.confirmBtn,
-                  verification?.my_verification === 'CONFIRM' && styles.verifyBtnActiveConfirm,
-                ]}
-                onPress={() => handleVerify('CONFIRM')}
-                disabled={verifyingLoading}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={[
-                    styles.verifyBtnText,
-                    styles.confirmBtnText,
-                    verification?.my_verification === 'CONFIRM' && styles.verifyBtnActiveText,
-                  ]}
-                >
-                  {verification?.my_verification === 'CONFIRM' ? '✓ You Confirmed' : '👍 Confirm'}
-                </Text>
-              </TouchableOpacity>
+            <View>
+              {hasVoted && (
+                <View style={styles.votedNoticeBox}>
+                  <Text style={styles.votedNoticeText}>
+                    {verification?.my_verification === 'CONFIRM'
+                      ? '✓ Your Decision: Confirmed (Permanent)'
+                      : '✗ Your Decision: Disputed (Permanent)'}
+                  </Text>
+                </View>
+              )}
 
-              <TouchableOpacity
-                style={[
-                  styles.verifyBtn,
-                  styles.disputeBtn,
-                  verification?.my_verification === 'DISPUTE' && styles.verifyBtnActiveDispute,
-                ]}
-                onPress={() => handleVerify('DISPUTE')}
-                disabled={verifyingLoading}
-                activeOpacity={0.7}
-              >
-                <Text
+              <View style={styles.verificationBtnGroup}>
+                <TouchableOpacity
                   style={[
-                    styles.verifyBtnText,
-                    styles.disputeBtnText,
-                    verification?.my_verification === 'DISPUTE' && styles.verifyBtnActiveText,
+                    styles.verifyBtn,
+                    styles.confirmBtn,
+                    verification?.my_verification === 'CONFIRM' && styles.verifyBtnActiveConfirm,
+                    hasVoted && styles.verifyBtnDisabled,
+                    hasVoted && verification?.my_verification !== 'CONFIRM' && styles.verifyBtnDisabledInactive,
                   ]}
+                  onPress={() => handleVerify('CONFIRM')}
+                  disabled={verifyingLoading || hasVoted}
+                  activeOpacity={hasVoted ? 1 : 0.7}
                 >
-                  {verification?.my_verification === 'DISPUTE' ? '✗ You Disputed' : '👎 Dispute'}
-                </Text>
-              </TouchableOpacity>
+                  <Text
+                    style={[
+                      styles.verifyBtnText,
+                      styles.confirmBtnText,
+                      verification?.my_verification === 'CONFIRM' && styles.verifyBtnActiveText,
+                      hasVoted && verification?.my_verification !== 'CONFIRM' && styles.verifyBtnDisabledInactiveText,
+                    ]}
+                  >
+                    {verification?.my_verification === 'CONFIRM' ? '✓ You Confirmed' : '👍 Confirm'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.verifyBtn,
+                    styles.disputeBtn,
+                    verification?.my_verification === 'DISPUTE' && styles.verifyBtnActiveDispute,
+                    hasVoted && styles.verifyBtnDisabled,
+                    hasVoted && verification?.my_verification !== 'DISPUTE' && styles.verifyBtnDisabledInactive,
+                  ]}
+                  onPress={() => handleVerify('DISPUTE')}
+                  disabled={verifyingLoading || hasVoted}
+                  activeOpacity={hasVoted ? 1 : 0.7}
+                >
+                  <Text
+                    style={[
+                      styles.verifyBtnText,
+                      styles.disputeBtnText,
+                      verification?.my_verification === 'DISPUTE' && styles.verifyBtnActiveText,
+                      hasVoted && verification?.my_verification !== 'DISPUTE' && styles.verifyBtnDisabledInactiveText,
+                    ]}
+                  >
+                    {verification?.my_verification === 'DISPUTE' ? '✗ You Disputed' : '👎 Dispute'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
 
@@ -1174,6 +1228,33 @@ const styles = StyleSheet.create({
   },
   verifyBtnActiveText: {
     color: '#ffffff',
+  },
+  votedNoticeBox: {
+    backgroundColor: '#f1f5f9',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: '#64748b',
+    alignItems: 'center',
+  },
+  votedNoticeText: {
+    fontSize: 12,
+    color: '#334155',
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  verifyBtnDisabled: {
+    opacity: 0.8,
+  },
+  verifyBtnDisabledInactive: {
+    backgroundColor: '#f8fafc',
+    borderColor: '#e2e8f0',
+    opacity: 0.5,
+  },
+  verifyBtnDisabledInactiveText: {
+    color: '#94a3b8',
   },
   verificationDisclaimer: {
     fontSize: 11,

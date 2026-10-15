@@ -54,9 +54,14 @@ export const verifyIncident = async (req: Request, res: Response): Promise<void>
         });
         return;
       }
-      if (result.code === 'INCIDENT_CLOSED' || result.code === 'INVALID_TYPE') {
+      if (
+        result.code === 'VOTE_ALREADY_CAST' ||
+        result.code === 'INCIDENT_CLOSED' ||
+        result.code === 'INVALID_TYPE'
+      ) {
         res.status(400).json({
           success: false,
+          code: result.code,
           message: result.message,
         });
         return;

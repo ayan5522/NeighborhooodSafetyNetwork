@@ -114,11 +114,33 @@ export const AlertsScreen: React.FC<AlertsScreenProps> = ({
           </View>
 
           <View style={styles.statusRow}>
-            {isUnread && !isExpired && (
+            {isUnread && !isExpired && item.status === 'ACTIVE' && item.incident?.status !== 'CANCELLED' && (
               <View style={styles.unreadDot} />
             )}
-            <View style={[styles.statusBadge, { backgroundColor: `${statusColor}15` }]}>
-              <Text style={[styles.statusText, { color: statusColor }]}>{item.status}</Text>
+            <View
+              style={[
+                styles.statusBadge,
+                {
+                  backgroundColor:
+                    item.incident?.status === 'CANCELLED'
+                      ? '#f3f4f6'
+                      : `${statusColor}15`,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.statusText,
+                  {
+                    color:
+                      item.incident?.status === 'CANCELLED'
+                        ? '#6b7280'
+                        : statusColor,
+                  },
+                ]}
+              >
+                {item.incident?.status === 'CANCELLED' ? 'CANCELLED' : item.status}
+              </Text>
             </View>
           </View>
         </View>

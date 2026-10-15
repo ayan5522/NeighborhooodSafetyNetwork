@@ -322,14 +322,20 @@ export class IncidentService {
 
   public static async cancelIncident(
     incidentId: string,
-    userId: string
+    userId: string,
+    userRole?: string
   ): Promise<IncidentRecord | 'FORBIDDEN' | 'NOT_FOUND' | 'ALREADY_CANCELLED'> {
     const existing = await this.getIncidentById(incidentId);
     if (!existing) {
       return 'NOT_FOUND';
     }
 
-    if (existing.reporter_id !== userId) {
+    // Only the incident reporter or an already-authorized role (ADMIN, MODERATOR) may cancel
+    if (
+      existing.reporter_id !== userId &&
+      userRole !== 'ADMIN' &&
+      userRole !== 'MODERATOR'
+    ) {
       return 'FORBIDDEN';
     }
 

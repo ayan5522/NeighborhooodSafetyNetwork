@@ -11,6 +11,14 @@ export interface UserLocationState {
   updated_at?: string;
 }
 
+export interface LocationSyncResult {
+  success: boolean;
+  location: UserLocationState | null;
+  error: string | null;
+  permissionDenied?: boolean;
+  servicesDisabled?: boolean;
+}
+
 export const useLocation = () => {
   const [location, setLocation] = useState<UserLocationState | null>(null);
   const [permissionStatus, setPermissionStatus] =
@@ -19,7 +27,7 @@ export const useLocation = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const requestAndSyncLocation = useCallback(async (): Promise<boolean> => {
+  const requestAndSyncLocation = useCallback(async (): Promise<LocationSyncResult> => {
     setLoading(true);
     setError(null);
 
@@ -29,11 +37,15 @@ export const useLocation = () => {
       setServicesEnabled(isServiceEnabled);
 
       if (!isServiceEnabled) {
-        setError(
-          'Location services are turned off. Please enable GPS / location services in your device settings.'
-        );
-        setLoading(false);
-        return false;
+        const errMsg =
+          'Location services are turned off. Please enable GPS / location services in your device settings.';
+        setError(errMsg);
+        return {
+          success: false,
+          location: null,
+          error: errMsg,
+          servicesDisabled: true,
+        };
       }
 
       // 2. Check and request foreground permissions
@@ -46,19 +58,36 @@ export const useLocation = () => {
 
       if (status !== 'granted') {
         setPermissionStatus('denied');
-        setError(
-          'Location permission is required to center the neighborhood map around your location.'
-        );
-        setLoading(false);
-        return false;
+        const errMsg =
+          'Location permission is required to center the neighborhood map around your location.';
+        setError(errMsg);
+        return {
+          success: false,
+          location: null,
+          error: errMsg,
+          permissionDenied: true,
+        };
       }
 
       setPermissionStatus('granted');
 
-      // 3. Obtain current position (Foreground only, on-demand)
-      const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
+      // 3. Obtain current position (Foreground only, on-demand with 10s timeout protection)
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              new Error('Location request timed out. Please check your GPS signal and try again.')
+            ),
+          10000
+        )
+      );
+
+      const position = await Promise.race([
+        Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        }),
+        timeoutPromise,
+      ]);
 
       const { latitude, longitude, accuracy } = position.coords;
 
@@ -69,9 +98,13 @@ export const useLocation = () => {
         longitude < -180 ||
         longitude > 180
       ) {
-        setError('Received invalid coordinates from location provider.');
-        setLoading(false);
-        return false;
+        const errMsg = 'Received invalid coordinates from location provider.';
+        setError(errMsg);
+        return {
+          success: false,
+          location: null,
+          error: errMsg,
+        };
       }
 
       const newLoc: UserLocationState = {
@@ -83,20 +116,35 @@ export const useLocation = () => {
       setLocation(newLoc);
 
       // 5. Sync to backend securely (JWT authentication)
-      const backendRes = await updateCurrentLocation(newLoc);
-      if (backendRes.success && backendRes.data) {
-        setLocation((prev) => (prev ? { ...prev, updated_at: backendRes.data?.updated_at } : prev));
+      try {
+        const backendRes = await updateCurrentLocation(newLoc);
+        if (backendRes.success && backendRes.data?.updated_at) {
+          newLoc.updated_at = backendRes.data.updated_at;
+          setLocation((prev) =>
+            prev ? { ...prev, updated_at: backendRes.data?.updated_at } : prev
+          );
+        }
+      } catch (syncErr) {
+        console.warn('Backend location sync warning:', syncErr);
       }
 
-      setLoading(false);
-      return true;
+      return {
+        success: true,
+        location: newLoc,
+        error: null,
+      };
     } catch (err: any) {
-      setError(
-        err.message ||
-          'Unable to determine your current location. Please check GPS and try again.'
-      );
+      const errMsg =
+        err?.message ||
+        'Unable to determine your current location. Please check GPS and try again.';
+      setError(errMsg);
+      return {
+        success: false,
+        location: null,
+        error: errMsg,
+      };
+    } finally {
       setLoading(false);
-      return false;
     }
   }, []);
 

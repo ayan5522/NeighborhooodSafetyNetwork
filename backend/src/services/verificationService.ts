@@ -21,7 +21,7 @@ export interface VerificationSummary {
 
 export type VerificationSubmissionResult =
   | { success: true; summary: VerificationSummary }
-  | { success: false; code: 'NOT_FOUND' | 'FORBIDDEN_SELF_VERIFY' | 'INCIDENT_CLOSED' | 'INVALID_TYPE'; message: string };
+  | { success: false; code: 'NOT_FOUND' | 'FORBIDDEN_SELF_VERIFY' | 'INCIDENT_CLOSED' | 'INVALID_TYPE' | 'VOTE_ALREADY_CAST'; message: string };
 
 export class VerificationService {
   /**
@@ -90,11 +90,12 @@ export class VerificationService {
   }
 
   /**
-   * Submit or update a verification (CONFIRM / DISPUTE) for an incident.
+   * Submit a verification (CONFIRM / DISPUTE) for an incident.
    * - Enforces authentication
    * - Prevents self-verification by reporter (403)
    * - Disallows verification for closed incidents (RESOLVED or CANCELLED)
-   * - Upserts record so user can change or reaffirm vote without duplicate rows
+   * - Enforces permanent decisions: users cannot change their vote once cast
+   * - Re-submitting identical vote is idempotent without duplicate rows or overwrites
    */
   public static async submitVerification(
     incidentId: string,
@@ -136,18 +137,58 @@ export class VerificationService {
       };
     }
 
-    // Upsert verification record
-    const upsertSql = `
-      INSERT INTO incident_verifications (incident_id, user_id, verification_type, updated_at)
-      VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
-      ON CONFLICT (incident_id, user_id)
-      DO UPDATE SET
-        verification_type = EXCLUDED.verification_type,
-        updated_at = CURRENT_TIMESTAMP
-      RETURNING *;
-    `;
+    // Guard: Check if user has already voted on this incident
+    const existingRes = await query(
+      'SELECT verification_type FROM incident_verifications WHERE incident_id = $1 AND user_id = $2',
+      [incidentId, userId]
+    );
 
-    await query(upsertSql, [incidentId, userId, verificationType]);
+    if (existingRes.rows.length > 0) {
+      const existingVote = existingRes.rows[0].verification_type;
+      if (existingVote !== verificationType) {
+        return {
+          success: false,
+          code: 'VOTE_ALREADY_CAST',
+          message: 'You have already voted on this incident. Community verification votes are permanent and cannot be changed.',
+        };
+      }
+
+      // Idempotent re-submission of the identical vote without duplicate row or re-notification
+      const summary = await this.getVerificationSummary(incidentId, userId);
+      return {
+        success: true,
+        summary,
+      };
+    }
+
+    // Insert new verification record (do not use upsert that overwrites an existing verification)
+    try {
+      await query(
+        `INSERT INTO incident_verifications (incident_id, user_id, verification_type, created_at, updated_at)
+         VALUES ($1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+        [incidentId, userId, verificationType]
+      );
+    } catch (dbErr: any) {
+      if (dbErr.code === '23505') {
+        const checkRes = await query(
+          'SELECT verification_type FROM incident_verifications WHERE incident_id = $1 AND user_id = $2',
+          [incidentId, userId]
+        );
+        if (checkRes.rows.length > 0 && checkRes.rows[0].verification_type !== verificationType) {
+          return {
+            success: false,
+            code: 'VOTE_ALREADY_CAST',
+            message: 'You have already voted on this incident. Community verification votes are permanent and cannot be changed.',
+          };
+        }
+        const summary = await this.getVerificationSummary(incidentId, userId);
+        return {
+          success: true,
+          summary,
+        };
+      }
+      throw dbErr;
+    }
 
     // Module 06: Generate COMMUNITY_VERIFICATION notification for incident reporter (shielding verifier identity)
     try {

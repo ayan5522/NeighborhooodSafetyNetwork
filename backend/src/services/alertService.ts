@@ -59,10 +59,14 @@ export class AlertService {
    * 5. Duplicate Prevention: uq_alerts_incident_recipient prevents duplicate records.
    */
   public static async generateAlertsForIncident(incident: IncidentRecord): Promise<number> {
+    if (incident.status === 'CANCELLED' || incident.status === 'RESOLVED') {
+      return 0;
+    }
+
     const rule = ALERT_PRIORITY_RULES[incident.severity] || ALERT_PRIORITY_RULES.MEDIUM;
     const maxAgeMinutes = config.location.maxAgeMinutes;
 
-    // Single efficient PostGIS spatial query + batch insertion
+    // Single efficient PostGIS spatial query + batch insertion with incident status verification
     const sql = `
       INSERT INTO alerts (incident_id, recipient_user_id, priority, status, expires_at)
       SELECT
@@ -73,7 +77,9 @@ export class AlertService {
         NOW() + ($3 || ' hours')::interval
       FROM user_locations ul
       JOIN users u ON ul.user_id = u.id
-      WHERE ul.user_id != $4
+      JOIN incidents i ON i.id = $1
+      WHERE i.status IN ('PENDING', 'ACTIVE')
+        AND ul.user_id != $4
         AND u.account_status = 'ACTIVE'
         AND ul.updated_at >= NOW() - ($5 || ' minutes')::interval
         AND ST_DWithin(
@@ -404,7 +410,10 @@ export class AlertService {
   /**
    * Resolve active alerts associated with a resolved incident.
    */
-  public static async resolveAlertsForIncident(incidentId: string): Promise<number> {
+  public static async resolveAlertsForIncident(
+    incidentId: string,
+    reason: 'RESOLVED' | 'CANCELLED' = 'RESOLVED'
+  ): Promise<number> {
     const sql = `
       UPDATE alerts
       SET status = 'RESOLVED'
@@ -414,13 +423,19 @@ export class AlertService {
     `;
     const res = await query(sql, [incidentId]);
 
+    const notifTitle = reason === 'CANCELLED' ? 'Alert Cancelled' : 'Alert Resolved';
+    const notifMessage =
+      reason === 'CANCELLED'
+        ? 'An earlier safety alert in your neighborhood has been cancelled by the reporter.'
+        : 'An earlier safety alert in your neighborhood has been resolved.';
+
     for (const alert of res.rows) {
       try {
         await NotificationService.createNotification({
           user_id: alert.recipient_user_id,
           type: 'ALERT_RESOLVED',
-          title: 'Alert Resolved',
-          message: 'An earlier safety alert in your neighborhood has been resolved.',
+          title: notifTitle,
+          message: notifMessage,
           incident_id: incidentId,
           alert_id: alert.id,
         });
@@ -435,8 +450,8 @@ export class AlertService {
         action: 'ALERT_RESOLVED',
         entity_type: 'incident',
         entity_id: incidentId,
-        description: `Resolved ${res.rowCount} alerts for incident ${incidentId}`,
-        metadata: { incident_id: incidentId, count: res.rowCount },
+        description: `Resolved ${res.rowCount} alerts for incident ${incidentId} (${reason})`,
+        metadata: { incident_id: incidentId, count: res.rowCount, reason },
       });
     }
 

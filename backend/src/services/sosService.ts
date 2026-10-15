@@ -124,6 +124,23 @@ export class SOSService {
       return 'FORBIDDEN';
     }
 
+    if (checkRes.rows[0].status === 'RESOLVED') {
+      const getRes = await query(
+        `SELECT id, user_id, latitude, longitude, status, created_at, resolved_at FROM sos_events WHERE id = $1`,
+        [sosId]
+      );
+      const row = getRes.rows[0];
+      return {
+        id: row.id,
+        user_id: row.user_id,
+        latitude: parseFloat(row.latitude),
+        longitude: parseFloat(row.longitude),
+        status: row.status,
+        created_at: row.created_at,
+        resolved_at: row.resolved_at,
+      };
+    }
+
     const sql = `
       UPDATE sos_events
       SET status = 'RESOLVED',

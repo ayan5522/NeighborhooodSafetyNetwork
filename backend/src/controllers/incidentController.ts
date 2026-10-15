@@ -321,7 +321,11 @@ export const cancelIncident = async (req: Request, res: Response): Promise<void>
   }
 
   try {
-    const result = await IncidentService.cancelIncident(req.params.id, req.user.id);
+    const result = await IncidentService.cancelIncident(
+      req.params.id,
+      req.user.id,
+      req.user.role
+    );
 
     if (result === 'NOT_FOUND') {
       res.status(404).json({
@@ -349,7 +353,7 @@ export const cancelIncident = async (req: Request, res: Response): Promise<void>
 
     // Resolve associated alerts
     try {
-      await AlertService.resolveAlertsForIncident(req.params.id);
+      await AlertService.resolveAlertsForIncident(req.params.id, 'CANCELLED');
     } catch (err) {
       console.error('Non-blocking alert resolution error:', err);
     }
